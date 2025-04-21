@@ -1,7 +1,6 @@
 streamlit
-langchain==0.1.0
-langchain-document-loaders
-langchain-community
+langchain>=0.1.0
+langchain-community>=0.0.16
 openai
 pillow
 chromadb
