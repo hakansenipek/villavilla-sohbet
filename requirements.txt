@@ -1,7 +1,7 @@
 streamlit
-langchain
+langchain==0.1.0
+langchain-document-loaders
 openai
 pillow
 chromadb
 docx2txt
-langchainhub
