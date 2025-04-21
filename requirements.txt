@@ -1,0 +1,7 @@
+streamlit
+langchain
+openai
+pillow
+chromadb
+docx2txt
+langchainhub
