@@ -10,12 +10,9 @@ from langchain.prompts import PromptTemplate
 from PIL import Image
 import shutil
 
-# 🔐 OpenAI API Key - Secrets'tan oku
-if "openai" in st.secrets:
+"openai" in st.secrets:
     os.environ["OPENAI_API_KEY"] = st.secrets["openai"]["api_key"]
-else:
-    # Eğer secrets yoksa, doğrudan kodu çalıştırırken değeri kullan
-    os.environ["OPENAI_API_KEY"] = "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"
+
 
 # 📂 Belge klasörü - GitHub'a yüklenecek belgeler için göreceli yol kullan
 # Proje klasörünüzde "belgeler" adında bir klasör oluşturun ve belgeleri oraya koyun
