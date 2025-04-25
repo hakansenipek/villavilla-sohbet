@@ -1,7 +1,13 @@
 streamlit
 langchain>=0.1.0
 langchain-community>=0.0.16
+langchain-core
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
 openai
 pillow
 chromadb
 docx2txt
+requests
+python-dateutil
