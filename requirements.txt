@@ -13,3 +13,4 @@ chromadb
 docx2txt
 requests
 python-dateutil
+python-docx

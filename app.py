@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import Chroma  # FAISS yerine Chroma kullanıyoruz
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
@@ -92,23 +92,24 @@ def create_test_documents():
     
     return documents
 
-# Vektör veritabanı oluşturma
+# Vektör veritabanı oluşturma - ChromaDB ile
 def create_vector_db(documents):
-    """Belgelerden vektör veritabanı oluşturur"""
+    """Belgelerden vektör veritabanı oluşturur - ChromaDB kullanarak"""
     if not documents:
         return None
     
     try:
-        # Tiktoken yüklü mü kontrol et
+        # Tiktoken yüklü mü kontrol et (hata ayıklama)
         try:
             import tiktoken
             print(f"Tiktoken sürümü: {tiktoken.__version__}")
         except ImportError:
-            print("Tiktoken yüklü değil!")
+            print("Tiktoken yüklü değil! Yükleniyor...")
             import sys
             import subprocess
             subprocess.check_call([sys.executable, "-m", "pip", "install", "tiktoken"])
             import tiktoken
+            print(f"Tiktoken yüklendi: {tiktoken.__version__}")
         
         # Belgeleri uygun parçalara böl
         splitter = RecursiveCharacterTextSplitter(
@@ -128,10 +129,7 @@ def create_vector_db(documents):
             embeddings = OpenAIEmbeddings()
             print("OpenAIEmbeddings başarıyla oluşturuldu")
             
-            # Chroma veritabanı oluştur (FAISS yerine)
-            from langchain.vectorstores import Chroma
-            
-            # Geçici bir dizin oluştur
+            # ChromaDB vektör veritabanı oluştur
             import tempfile
             persist_directory = tempfile.mkdtemp()
             
@@ -252,7 +250,7 @@ def main():
         st.session_state.chat_history = []
     
     # Paket bağımlılıklarını kontrol et ve gerekirse yükle
-    required_packages = ["tiktoken", "faiss-cpu", "openai"]
+    required_packages = ["tiktoken", "openai"]  # faiss-cpu çıkarıldı
     missing_packages = []
     
     # Gerekli paketleri kontrol et
@@ -270,7 +268,7 @@ def main():
             for package in missing_packages:
                 subprocess.check_call([sys.executable, "-m", "pip", "install", package])
             st.success("Paketler yüklendi. Sayfa yenileniyor...")
-            st.rerun()
+            st.rerun()  # experimental_rerun yerine rerun kullanılıyor
     
     # Test belgelerini oluştur
     with st.spinner("Belgeler hazırlanıyor..."):
@@ -292,7 +290,7 @@ def main():
                 with col2:
                     if st.button("🔄 Temizle", use_container_width=True):
                         st.session_state.chat_history = []
-                        st.rerun()
+                        st.rerun()  # experimental_rerun yerine rerun kullanılıyor
                 
                 # Sohbet geçmişini görüntüle
                 for i in range(0, len(st.session_state.chat_history), 2):
@@ -374,8 +372,8 @@ def main():
             st.code(f"""
             Paketler:
             - tiktoken: {__import__('importlib').util.find_spec('tiktoken') is not None}
-            - faiss-cpu: {__import__('importlib').util.find_spec('faiss') is not None}
             - langchain: {__import__('importlib').util.find_spec('langchain') is not None}
+            - chromadb: {__import__('importlib').util.find_spec('chromadb') is not None}
             """)
 
 # Uygulamayı çalıştır
