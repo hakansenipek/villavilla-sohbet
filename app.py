@@ -133,13 +133,13 @@ def create_vector_db(documents):
             import tempfile
             persist_directory = tempfile.mkdtemp()
             
-            vector_db = Chroma.from_documents(
-                documents=chunks,
-                embedding=embeddings,
-                persist_directory=persist_directory
-            )
-            print("Chroma vektör veritabanı başarıyla oluşturuldu")
-            return vector_db
+           # ChromaDB vektör veritabanı oluştur - in-memory kullanarak
+	vector_db = Chroma.from_documents(
+    		documents=chunks,
+    		embedding=embeddings,
+    	# persist_directory parametresi kaldırıldı
+		)
+		print("Chroma vektör veritabanı in-memory olarak oluşturuldu")
             
         except Exception as e:
             import traceback
