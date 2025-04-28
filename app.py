@@ -147,8 +147,8 @@ def create_vector_db(documents):
         st.info(f"Belgeler {len(chunks)} parçaya bölündü")
         
         # Embeddings oluştur
-          try:
-    	embeddings = OpenAIEmbeddings(
+     try:
+    embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small"
     )
     print("OpenAIEmbeddings başarıyla oluşturuldu")
@@ -158,6 +158,8 @@ def create_vector_db(documents):
         documents=chunks,
         embedding=embeddings,
     )
+    print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
+    return vector_db
     print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
     return vector_db
             
