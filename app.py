@@ -133,46 +133,44 @@ def create_test_documents():
 
 # ---------------------------------------
 # ---------------------------------------
+# ---------------------------------------
 # 6. Vektör Veritabanı (DocArrayInMemorySearch)
 # ---------------------------------------
 def create_vector_db(documents):
-   try:
-       # Belgeleri parçalara böl
-       splitter = RecursiveCharacterTextSplitter(
-           chunk_size=800,
-           chunk_overlap=150,
-           separators=["\n\n", "\n", ". ", " ", ""],
-           length_function=len
-       )
-       chunks = splitter.split_documents(documents)
-       st.info(f"Belgeler {len(chunks)} parçaya bölündü")
-       
-       # Embeddings oluştur
-       try:
-           embeddings = OpenAIEmbeddings(
-               model="text-embedding-3-small"
-           )
-           print("OpenAIEmbeddings başarıyla oluşturuldu")
-           
-           # DocArrayInMemorySearch vektör veritabanı oluştur
-           vector_db = DocArrayInMemorySearch.from_documents(
-               documents=chunks,
-               embedding=embeddings,
-           )
-           print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
-           return vector_db
-           
-       except Exception as e:
-           logging.error(f"Embedding hatası: {str(e)}")
-           st.error(f"Embedding oluşturulurken hata: {str(e)}")
-           return None
-           
-   except Exception as e:
-       logging.error(f"Embedding hatası: {str(e)}")
-       st.error(f"Embedding oluşturulurken hata: {str(e)}")
-       return None    except Exception as e:
+    try:
+        # Belgeleri parçalara böl
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=800,
+            chunk_overlap=150,
+            separators=["\n\n", "\n", ". ", " ", ""],
+            length_function=len
+        )
+        chunks = splitter.split_documents(documents)
+        st.info(f"Belgeler {len(chunks)} parçaya bölündü")
+        
+        # Embeddings oluştur
+        try:
+            embeddings = OpenAIEmbeddings(
+                model="text-embedding-3-small"
+            )
+            print("OpenAIEmbeddings başarıyla oluşturuldu")
+            
+            # DocArrayInMemorySearch vektör veritabanı oluştur
+            vector_db = DocArrayInMemorySearch.from_documents(
+                documents=chunks,
+                embedding=embeddings,
+            )
+            print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
+            return vector_db
+            
+        except Exception as e:
+            logging.error(f"Embedding hatası: {str(e)}")
+            st.error(f"Embedding oluşturulurken hata: {str(e)}")
+            return None
+            
+    except Exception as e:
         logging.error(f"Vektör veritabanı hatası: {str(e)}")
-        st.error("Vektör veritabanı oluşturulamadı.")
+        st.error(f"Vektör veritabanı oluşturulurken hata: {str(e)}")
         return None
 
 # ---------------------------------------
