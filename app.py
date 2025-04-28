@@ -1,5 +1,3 @@
-# streamlit_app.py
-
 import os
 import sys
 import tempfile
@@ -27,7 +25,7 @@ logging.basicConfig(
 )
 
 # ---------------------------------------
-# 2. Sayfa Yapısı
+# 2. Streamlit Sayfa Yapısı
 # ---------------------------------------
 st.set_page_config(page_title="Villa Villa Yapay Zeka", layout="centered")
 
@@ -43,7 +41,7 @@ with col2:
 st.markdown("---")
 
 # ---------------------------------------
-# 3. API Anahtarı Yönetimi
+# 3. OpenAI API Anahtarı Yönetimi
 # ---------------------------------------
 openai_api_key = st.secrets.get("openai", {}).get("api_key", None)
 if openai_api_key:
@@ -53,7 +51,7 @@ else:
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
     else:
-        st.error("API anahtarı bulunamadı. Lütfen OpenAI API anahtarınızı girin.")
+        st.error("API anahtarı girilmedi. Lütfen OpenAI API anahtarınızı girin.")
         st.stop()
 
 # ---------------------------------------
@@ -78,7 +76,7 @@ def load_documents_from_folder(folder_path="data"):
     return documents
 
 # ---------------------------------------
-# 5. Vektör Veritabanı Kurulumu (Chroma)
+# 5. Vektör Veritabanı (Chroma)
 # ---------------------------------------
 def create_vector_db(documents):
     try:
@@ -105,13 +103,13 @@ def create_vector_db(documents):
         return None
 
 # ---------------------------------------
-# 6. Prompt Şablonu
+# 6. Özel Prompt Şablonu
 # ---------------------------------------
 def create_qa_prompt():
     template = """
-    Sen Villa Villa şirketinin yapay zekâ destekli asistanısın. Aşağıdaki içeriklere dayanarak müşterinin sorusunu yanıtla:
+    Sen Villa Villa şirketinin yapay zekâ destekli bir asistanısın. Aşağıdaki içeriklere dayanarak müşterinin sorusunu yanıtla:
 
-    Belgelerden Alınan Bilgiler:
+    Belgelerden Bilgiler:
     {context}
 
     Sohbet Geçmişi:
@@ -121,16 +119,16 @@ def create_qa_prompt():
     {question}
 
     Notlar:
-    - Sadece belgelerdeki bilgiler üzerinden cevap ver.
-    - Bilgi yoksa 'Bu konuda veri bulunmamaktadır.' diye belirt.
-    - Profesyonel ve kibar ol.
+    - Yalnızca belgedeki bilgiler doğrultusunda cevap ver.
+    - Bilgi bulunamazsa 'Bu konuda mevcut veri bulunmamaktadır.' yaz.
+    - Profesyonel, açık ve kibar bir dil kullan.
 
-    Yanıtın:
+    Yanıt:
     """
     return PromptTemplate(input_variables=["context", "chat_history", "question"], template=template)
 
 # ---------------------------------------
-# 7. Chat Chain Kurulumu
+# 7. Chat Zinciri Kurulumu
 # ---------------------------------------
 def create_chat_chain(vector_db):
     llm = ChatOpenAI(
@@ -153,16 +151,15 @@ def create_chat_chain(vector_db):
 # 8. Ana Uygulama
 # ---------------------------------------
 def main():
-    # Belgeleri yükle
     with st.spinner("Belgeler yükleniyor..."):
         documents = load_documents_from_folder("data")
         if not documents:
-            st.error("Hiç belge bulunamadı.")
+            st.error("Belge bulunamadı. 'data/' klasörüne .docx dosyalarınızı yükleyin.")
             st.stop()
         
         vector_db = create_vector_db(documents)
         if not vector_db:
-            st.error("Veritabanı oluşturulamadı.")
+            st.error("Vektör veritabanı oluşturulamadı.")
             st.stop()
         
         chat_chain = create_chat_chain(vector_db)
@@ -170,14 +167,14 @@ def main():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     
-    st.success("Belgeler yüklendi, sohbet başlayabilir!")
+    st.success("Belgeler yüklendi. Şimdi sorularınızı sorabilirsiniz!")
 
     for role, message in st.session_state.chat_history:
         with st.chat_message(role):
             st.markdown(message)
     
     user_input = st.chat_input("Sorunuzu yazınız...")
-    
+
     if user_input:
         with st.chat_message("user"):
             st.markdown(user_input)
@@ -203,7 +200,7 @@ def main():
         except Exception as e:
             logging.error(str(e))
             with st.chat_message("assistant"):
-                st.error("Yanıt üretilemedi. Lütfen tekrar deneyiniz.")
+                st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu.")
 
 # ---------------------------------------
 # 9. Uygulama Başlatılıyor
