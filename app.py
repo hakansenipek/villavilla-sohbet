@@ -200,7 +200,8 @@ def create_chat_chain(vector_db):
     try:
         llm = ChatOpenAI(
             temperature=0.2,
-            model_name="gpt-4-turbo"  
+            model_name="gpt-4-turbo"  # gpt-4-0125-preview yerine güncel model
+        )
         
         retriever = vector_db.as_retriever(search_type="similarity", search_kwargs={"k": 5})
         qa_prompt = create_qa_prompt()
@@ -216,6 +217,7 @@ def create_chat_chain(vector_db):
         logging.error(f"Chat zinciri hatası: {str(e)}")
         st.error("Sohbet sistemi oluşturulamadı.")
         return None
+
 # ---------------------------------------
 # 9. Ana Uygulama
 # ---------------------------------------
