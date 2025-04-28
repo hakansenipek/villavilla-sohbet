@@ -12,4 +12,4 @@ docx2txt
 requests
 python-dateutil
 tiktoken
-faiss-cpu
+faiss-cpu==1.7.4
