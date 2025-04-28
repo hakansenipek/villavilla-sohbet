@@ -25,11 +25,19 @@ with col2:
 # Ayırıcı çizgi
 st.markdown("---")
 
-# API anahtarlarını Streamlit secrets'tan alma
-try:
-    os.environ["OPENAI_API_KEY"] = st.secrets["openai"]["api_key"]
-except Exception:
-    st.error("OpenAI API anahtarı secrets.toml dosyasında bulunamadı.")
+# API anahtarını doğrudan ayarlama (güvenlik için secrets kullanımı önerilir)
+openai_api_key = st.secrets.get("openai", {}).get("api_key", None)
+if openai_api_key:
+    os.environ["OPENAI_API_KEY"] = openai_api_key
+    print("API anahtarı secrets'tan ayarlandı")
+else:
+    # API anahtarını manuel giriş olarak ekleyebilirsiniz (test için)
+    api_key = st.sidebar.text_input("OpenAI API Key", type="password")
+    if api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
+        print("API anahtarı manuel olarak ayarlandı")
+    else:
+        st.error("API anahtarı bulunamadı. Lütfen OpenAI API anahtarınızı girin.")
 
 # Test amacıyla sabit veriler oluşturma
 def create_test_documents():
@@ -85,13 +93,24 @@ def create_test_documents():
     return documents
 
 # Vektör veritabanı oluşturma
-
 def create_vector_db(documents):
     """Belgelerden vektör veritabanı oluşturur"""
     if not documents:
         return None
     
     try:
+        # Tiktoken yüklü mü kontrol et (hata ayıklama)
+        try:
+            import tiktoken
+            print(f"Tiktoken sürümü: {tiktoken.__version__}")
+        except ImportError:
+            print("Tiktoken yüklü değil! Yükleniyor...")
+            import sys
+            import subprocess
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "tiktoken"])
+            import tiktoken
+            print(f"Tiktoken yüklendi: {tiktoken.__version__}")
+        
         # Belgeleri uygun parçalara böl
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=800,
@@ -100,18 +119,50 @@ def create_vector_db(documents):
             length_function=len
         )
         chunks = splitter.split_documents(documents)
+        print(f"Belgeler {len(chunks)} parçaya bölündü")
+        
+        # OPENAI_API_KEY kontrol et
+        print(f"API Anahtarı ayarlandı mı: {'OPENAI_API_KEY' in os.environ}")
         
         # Vektör embeddingler oluştur
-        embeddings = OpenAIEmbeddings()
+        try:
+            embeddings = OpenAIEmbeddings()
+            print("OpenAIEmbeddings başarıyla oluşturuldu")
+            
+            # Vektör veritabanı oluştur
+            vector_db = FAISS.from_documents(
+                documents=chunks,
+                embedding=embeddings,
+            )
+            print("FAISS vektör veritabanı başarıyla oluşturuldu")
+            return vector_db
+            
+        except Exception as e:
+            import traceback
+            error_msg = f"Embedding oluşturma hatası: {str(e)}"
+            print(error_msg)
+            print(f"Hata detayı: {traceback.format_exc()}")
+            
+            # Alternatif embedding deneme (OpenAI çalışmazsa)
+            try:
+                print("Alternatif embedding deneniyor...")
+                from langchain.embeddings import HuggingFaceEmbeddings
+                embeddings = HuggingFaceEmbeddings()
+                print("HuggingFaceEmbeddings başarıyla oluşturuldu")
+                
+                vector_db = FAISS.from_documents(
+                    documents=chunks,
+                    embedding=embeddings,
+                )
+                print("FAISS vektör veritabanı HuggingFace ile oluşturuldu")
+                return vector_db
+            except Exception as e2:
+                print(f"Alternatif embedding de başarısız: {str(e2)}")
+                st.error(f"Vektör veritabanı oluşturulurken hata: {str(e)}")
+                return None
         
-        # Vektör veritabanı oluştur (Chroma yerine FAISS kullan)
-        vector_db = FAISS.from_documents(
-            documents=chunks,
-            embedding=embeddings,
-        )
-        
-        return vector_db
     except Exception as e:
+        print(f"Genel hata: {str(e)}")
         st.error(f"Vektör veritabanı oluşturulurken hata: {str(e)}")
         return None
 
@@ -169,6 +220,11 @@ def create_chat_chain(vector_db):
         return None
     
     try:
+        # API anahtarı kontrol et
+        if "OPENAI_API_KEY" not in os.environ:
+            st.error("OpenAI API anahtarı bulunamadı")
+            return None
+            
         # GPT model
         llm = ChatOpenAI(
             temperature=0.2,
@@ -192,8 +248,10 @@ def create_chat_chain(vector_db):
             combine_docs_chain_kwargs={"prompt": qa_prompt}
         )
         
+        print("Sohbet zinciri başarıyla oluşturuldu")
         return chat_chain
     except Exception as e:
+        print(f"Sohbet zinciri hatası: {str(e)}")
         st.error(f"Sohbet zinciri oluşturulurken hata: {str(e)}")
         return None
 
@@ -203,17 +261,40 @@ def main():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     
+    # Paket bağımlılıklarını kontrol et ve gerekirse yükle
+    required_packages = ["tiktoken", "faiss-cpu", "openai"]
+    missing_packages = []
+    
+    # Gerekli paketleri kontrol et
+    for package in required_packages:
+        try:
+            __import__(package)
+        except ImportError:
+            missing_packages.append(package)
+    
+    # Eksik paketleri yükle
+    if missing_packages:
+        with st.spinner(f"Gerekli paketler yükleniyor: {', '.join(missing_packages)}..."):
+            import sys
+            import subprocess
+            for package in missing_packages:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+            st.success("Paketler yüklendi. Sayfa yenileniyor...")
+            st.experimental_rerun()
+    
     # Test belgelerini oluştur
     with st.spinner("Belgeler hazırlanıyor..."):
         documents = create_test_documents()
     
     if documents:
         # Vektör veritabanı oluştur
-        vector_db = create_vector_db(documents)
+        with st.spinner("Vektör veritabanı oluşturuluyor..."):
+            vector_db = create_vector_db(documents)
         
         if vector_db:
             # Sohbet zincirini oluştur
-            chat_chain = create_chat_chain(vector_db)
+            with st.spinner("Sohbet modeli hazırlanıyor..."):
+                chat_chain = create_chat_chain(vector_db)
             
             if chat_chain:
                 # Temizleme butonu - sağ üstte küçük
@@ -278,6 +359,7 @@ def main():
                             st.session_state.chat_history.append(("ai", response["answer"]))
                             
                         except Exception as e:
+                            print(f"Yanıt hatası: {str(e)}")
                             st.error(f"Yanıt oluşturulurken hata: {str(e)}")
                             # Kullanıcıya hata mesajı
                             with st.chat_message("assistant"):
@@ -285,15 +367,26 @@ def main():
                             # Hata mesajını geçmişe ekle
                             st.session_state.chat_history.append(("ai", "Üzgünüm, teknik bir sorun yaşandı."))
             else:
-                st.error("Sohbet zinciri oluşturulamadı.")
+                st.error("Sohbet zinciri oluşturulamadı. API anahtarını kontrol edin.")
         else:
-            st.error("Vektör veritabanı oluşturulamadı.")
+            st.error("Vektör veritabanı oluşturulamadı. Paket kurulumunu kontrol edin.")
     else:
         st.error("Belgeler hazırlanamadı.")
     
     # Gelişmiş modda yönetici kontrolleri
     with st.expander("⚙️ Yönetici Ayarları", expanded=False):
         st.warning("Şu anda test modu aktif - gerçek veriler yerine örnek veriler kullanılıyor.")
+        # API durumu
+        st.info(f"API Anahtarı durumu: {'Ayarlandı ✅' if 'OPENAI_API_KEY' in os.environ else 'Ayarlanmadı ❌'}")
+        
+        # Debug bilgisi
+        if st.checkbox("Debug modunu aç"):
+            st.code(f"""
+            Paketler:
+            - tiktoken: {__import__('importlib').util.find_spec('tiktoken') is not None}
+            - faiss-cpu: {__import__('importlib').util.find_spec('faiss') is not None}
+            - langchain: {__import__('importlib').util.find_spec('langchain') is not None}
+            """)
 
 # Uygulamayı çalıştır
 if __name__ == "__main__":

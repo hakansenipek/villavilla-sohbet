@@ -11,3 +11,5 @@ chromadb
 docx2txt
 requests
 python-dateutil
+tiktoken
+faiss-cpu
