@@ -99,17 +99,16 @@ def create_vector_db(documents):
         return None
     
     try:
-        # Tiktoken yüklü mü kontrol et (hata ayıklama)
+        # Tiktoken yüklü mü kontrol et
         try:
             import tiktoken
             print(f"Tiktoken sürümü: {tiktoken.__version__}")
         except ImportError:
-            print("Tiktoken yüklü değil! Yükleniyor...")
+            print("Tiktoken yüklü değil!")
             import sys
             import subprocess
             subprocess.check_call([sys.executable, "-m", "pip", "install", "tiktoken"])
             import tiktoken
-            print(f"Tiktoken yüklendi: {tiktoken.__version__}")
         
         # Belgeleri uygun parçalara böl
         splitter = RecursiveCharacterTextSplitter(
@@ -129,12 +128,19 @@ def create_vector_db(documents):
             embeddings = OpenAIEmbeddings()
             print("OpenAIEmbeddings başarıyla oluşturuldu")
             
-            # Vektör veritabanı oluştur
-            vector_db = FAISS.from_documents(
+            # Chroma veritabanı oluştur (FAISS yerine)
+            from langchain.vectorstores import Chroma
+            
+            # Geçici bir dizin oluştur
+            import tempfile
+            persist_directory = tempfile.mkdtemp()
+            
+            vector_db = Chroma.from_documents(
                 documents=chunks,
                 embedding=embeddings,
+                persist_directory=persist_directory
             )
-            print("FAISS vektör veritabanı başarıyla oluşturuldu")
+            print("Chroma vektör veritabanı başarıyla oluşturuldu")
             return vector_db
             
         except Exception as e:
@@ -142,24 +148,8 @@ def create_vector_db(documents):
             error_msg = f"Embedding oluşturma hatası: {str(e)}"
             print(error_msg)
             print(f"Hata detayı: {traceback.format_exc()}")
-            
-            # Alternatif embedding deneme (OpenAI çalışmazsa)
-            try:
-                print("Alternatif embedding deneniyor...")
-                from langchain.embeddings import HuggingFaceEmbeddings
-                embeddings = HuggingFaceEmbeddings()
-                print("HuggingFaceEmbeddings başarıyla oluşturuldu")
-                
-                vector_db = FAISS.from_documents(
-                    documents=chunks,
-                    embedding=embeddings,
-                )
-                print("FAISS vektör veritabanı HuggingFace ile oluşturuldu")
-                return vector_db
-            except Exception as e2:
-                print(f"Alternatif embedding de başarısız: {str(e2)}")
-                st.error(f"Vektör veritabanı oluşturulurken hata: {str(e)}")
-                return None
+            st.error(f"Vektör veritabanı oluşturulurken hata: {str(e)}")
+            return None
         
     except Exception as e:
         print(f"Genel hata: {str(e)}")
