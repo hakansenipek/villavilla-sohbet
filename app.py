@@ -147,9 +147,9 @@ def create_vector_db(documents):
         st.info(f"Belgeler {len(chunks)} parçaya bölündü")
         
         # Embeddings oluştur
-        try:
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small"  # Yeni embedding modeli
+          try:
+    	embeddings = OpenAIEmbeddings(
+        model="text-embedding-3-small"
     )
     print("OpenAIEmbeddings başarıyla oluşturuldu")
     
@@ -160,9 +160,6 @@ def create_vector_db(documents):
     )
     print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
     return vector_db
-
-            st.success("Vektör veritabanı başarıyla oluşturuldu")
-            return vector_db
             
         except Exception as e:
             logging.error(f"Embedding hatası: {str(e)}")
