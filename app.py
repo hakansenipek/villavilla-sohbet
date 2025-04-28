@@ -126,28 +126,16 @@ def create_vector_db(documents):
         
         # Vektör embeddingler oluştur
         try:
-            embeddings = OpenAIEmbeddings()
-            print("OpenAIEmbeddings başarıyla oluşturuldu")
+           embeddings = OpenAIEmbeddings()
+print("OpenAIEmbeddings başarıyla oluşturuldu")
             
-            # ChromaDB vektör veritabanı oluştur
-            import tempfile
-            persist_directory = tempfile.mkdtemp()
-            
-           # ChromaDB vektör veritabanı oluştur - in-memory kullanarak
-	vector_db = Chroma.from_documents(
-    		documents=chunks,
-    		embedding=embeddings,
-    	# persist_directory parametresi kaldırıldı
-		)
-		print("Chroma vektör veritabanı in-memory olarak oluşturuldu")
-            
-        except Exception as e:
-            import traceback
-            error_msg = f"Embedding oluşturma hatası: {str(e)}"
-            print(error_msg)
-            print(f"Hata detayı: {traceback.format_exc()}")
-            st.error(f"Vektör veritabanı oluşturulurken hata: {str(e)}")
-            return None
+# ChromaDB vektör veritabanı oluştur - in-memory kullanarak
+vector_db = Chroma.from_documents(
+    documents=chunks,
+    embedding=embeddings,
+    # persist_directory parametresi kaldırıldı
+)
+print("Chroma vektör veritabanı in-memory olarak oluşturuldu")
         
     except Exception as e:
         print(f"Genel hata: {str(e)}")
