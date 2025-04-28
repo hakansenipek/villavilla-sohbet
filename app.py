@@ -148,7 +148,7 @@ def create_vector_db(documents):
         
         # Embeddings oluştur
         try:
-            embeddings = OpenAIEmbeddings()
+            model="text-embedding-3-small"
             
             # DocArrayInMemorySearch vektör veritabanı oluştur
             vector_db = DocArrayInMemorySearch.from_documents(
