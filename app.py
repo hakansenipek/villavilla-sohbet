@@ -85,7 +85,7 @@ def create_test_documents():
     return documents
 
 # Vektör veritabanı oluşturma
-@st.cache_resource
+
 def create_vector_db(documents):
     """Belgelerden vektör veritabanı oluşturur"""
     if not documents:
