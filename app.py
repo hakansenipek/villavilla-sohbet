@@ -148,13 +148,19 @@ def create_vector_db(documents):
         
         # Embeddings oluştur
         try:
-            model="text-embedding-3-small"
-            
-            # DocArrayInMemorySearch vektör veritabanı oluştur
-            vector_db = DocArrayInMemorySearch.from_documents(
-                documents=chunks,
-                embedding=embeddings,
-            )
+    embeddings = OpenAIEmbeddings(
+        model="text-embedding-3-small"  # Yeni embedding modeli
+    )
+    print("OpenAIEmbeddings başarıyla oluşturuldu")
+    
+    # DocArrayInMemorySearch vektör veritabanı oluştur
+    vector_db = DocArrayInMemorySearch.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+    )
+    print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
+    return vector_db
+
             st.success("Vektör veritabanı başarıyla oluşturuldu")
             return vector_db
             
