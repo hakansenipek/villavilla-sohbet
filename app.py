@@ -207,16 +207,47 @@ def prepare_parasut_data_for_langchain(invoices):
 # Google Drive'dan dosyaları indirme
 @st.cache_data(ttl=3600)  # 1 saat önbellekte tut
 def download_files_from_drive():
-    """Google Drive'dan Villa Villa belgelerini indirir"""
+    """Google Drive'dan Villa Villa belgelerini indirir ve hata ayıklama ekler"""
+    st.write("Google Drive bağlantısı kuruluyor...")
+    
     if "token" not in st.session_state:
-        st.warning("Belgelere erişim için Google hesabınıza bağlanmalısınız")
+        st.warning("Google hesabınıza bağlanmalısınız. Token bulunamadı.")
         return {}
     
-    service = get_gdrive_service()
-    if not service:
+    try:
+        st.write(f"Token: {st.session_state.token[:10]}... (gizlilik için kısaltıldı)")
+        
+        creds = Credentials(
+            token=st.session_state.get("token"),
+            refresh_token=st.session_state.get("refresh_token"),
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=st.secrets["google_auth"]["client_id"],
+            client_secret=st.secrets["google_auth"]["client_secret"]
+        )
+        
+        service = build('drive', 'v3', credentials=creds)
+        st.write("Drive servisi oluşturuldu.")
+        
+        # Test: Drive'daki dosyaları listele
+        results = service.files().list(pageSize=10).execute()
+        items = results.get('files', [])
+        
+        if not items:
+            st.write('Drive\'da dosya bulunamadı.')
+        else:
+            st.write('Drive\'daki dosyalar:')
+            for item in items:
+                st.write(f"{item['name']} ({item['id']})")
+        
+        # Normal dosya indirme işlemleri devam eder...
+        
+    except Exception as e:
+        st.error(f"Google Drive bağlantısında hata: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
         return {}
-    
-    # Dosya ID'lerini secrets'tan al
+
+ # Dosya ID'lerini secrets'tan al
     try:
         file_ids = st.secrets["drive_files"]
     except Exception:
