@@ -2,6 +2,8 @@ streamlit
 langchain>=0.1.0
 langchain-community>=0.0.16
 langchain-core
+tiktoken
+faiss-cpu==1.7.4
 google-api-python-client
 google-auth-oauthlib
 google-auth-httplib2
@@ -11,5 +13,3 @@ chromadb
 docx2txt
 requests
 python-dateutil
-tiktoken
-faiss-cpu==1.7.4
