@@ -1,3 +1,4 @@
+# streamlit_app.py
 
 import os
 import sys
@@ -11,6 +12,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.docstore.document import Document
+from docx import Document as DocxDocument
 
 # ---------------------------------------
 # 1. Loglama Ayarları
@@ -25,7 +27,7 @@ logging.basicConfig(
 )
 
 # ---------------------------------------
-# 2. Streamlit Sayfa Yapısı
+# 2. Sayfa Yapısı
 # ---------------------------------------
 st.set_page_config(page_title="Villa Villa Yapay Zeka", layout="centered")
 
@@ -51,44 +53,32 @@ else:
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
     else:
-        st.error("API anahtarı girilmedi. Lütfen API anahtarınızı girin.")
+        st.error("API anahtarı bulunamadı. Lütfen OpenAI API anahtarınızı girin.")
         st.stop()
 
 # ---------------------------------------
-# 4. Belgeleri Yükleme Fonksiyonu
+# 4. Belgeleri Yükleme Fonksiyonu (.docx)
 # ---------------------------------------
-def load_documents():
-    yapilan_isler = """
-    Villa Villa Organizasyon - Yapılan İşler
+def load_documents_from_folder(folder_path="data"):
+    documents = []
+    if not os.path.exists(folder_path):
+        st.error(f"Belge klasörü bulunamadı: {folder_path}")
+        return documents
 
-    Tarih: 15 Nisan 2025
-    Müşteri: ABC Şirketi
-    Etkinlik Türü: Kurumsal Yıl Dönümü
-    Kişi Sayısı: 150
-    Menü: Ana yemek, 5 çeşit meze, 2 çeşit tatlı
-    Toplam Maliyet: 75,000 TL
-    """
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".docx"):
+            full_path = os.path.join(folder_path, filename)
+            try:
+                docx = DocxDocument(full_path)
+                text = "\n".join([p.text for p in docx.paragraphs if p.text.strip() != ""])
+                documents.append(Document(page_content=text, metadata={"source": filename}))
+            except Exception as e:
+                logging.error(f"{filename} yüklenirken hata: {str(e)}")
     
-    genel_gider = """
-    Villa Villa Organizasyon - Genel Giderler
-
-    Nisan 2025:
-    Kira: 15,000 TL
-    Elektrik: 2,500 TL
-    Su: 800 TL
-    İnternet: 600 TL
-    Personel Maaşları: 45,000 TL
-    Toplam: 63,900 TL
-    """
-    
-    docs = [
-        Document(page_content=yapilan_isler, metadata={"source": "yapilan_isler"}),
-        Document(page_content=genel_gider, metadata={"source": "genel_gider"})
-    ]
-    return docs
+    return documents
 
 # ---------------------------------------
-# 5. Vektör Veritabanı (Chroma)
+# 5. Vektör Veritabanı Kurulumu (Chroma)
 # ---------------------------------------
 def create_vector_db(documents):
     try:
@@ -109,7 +99,6 @@ def create_vector_db(documents):
             persist_directory=persist_directory
         )
         return vector_db
-    
     except Exception as e:
         logging.error(str(e))
         st.error("Vektör veritabanı oluşturulamadı.")
@@ -120,9 +109,9 @@ def create_vector_db(documents):
 # ---------------------------------------
 def create_qa_prompt():
     template = """
-    Sen Villa Villa şirketinin yapay zekâ destekli bir asistanısın. Aşağıdaki bilgiler ışığında soruları yanıtla:
+    Sen Villa Villa şirketinin yapay zekâ destekli asistanısın. Aşağıdaki içeriklere dayanarak müşterinin sorusunu yanıtla:
 
-    Belgeler:
+    Belgelerden Alınan Bilgiler:
     {context}
 
     Sohbet Geçmişi:
@@ -131,12 +120,12 @@ def create_qa_prompt():
     Soru:
     {question}
 
-    Talimatlar:
-    - Yalnızca belgelerde verilen bilgiye dayan.
-    - Bilgi yoksa 'Bu konuda elimde veri bulunmamaktadır.' de.
-    - Her zaman nazik ve profesyonel bir dil kullan.
+    Notlar:
+    - Sadece belgelerdeki bilgiler üzerinden cevap ver.
+    - Bilgi yoksa 'Bu konuda veri bulunmamaktadır.' diye belirt.
+    - Profesyonel ve kibar ol.
 
-    Cevabın:
+    Yanıtın:
     """
     return PromptTemplate(input_variables=["context", "chat_history", "question"], template=template)
 
@@ -150,7 +139,6 @@ def create_chat_chain(vector_db):
     )
     
     retriever = vector_db.as_retriever(search_type="similarity", search_kwargs={"k": 5})
-    
     qa_prompt = create_qa_prompt()
     
     chain = ConversationalRetrievalChain.from_llm(
@@ -159,45 +147,36 @@ def create_chat_chain(vector_db):
         return_source_documents=True,
         combine_docs_chain_kwargs={"prompt": qa_prompt}
     )
-    
     return chain
 
 # ---------------------------------------
 # 8. Ana Uygulama
 # ---------------------------------------
 def main():
-    # Giriş yapıldı mı kontrol
-    if "authenticated" not in st.session_state:
-        password = st.sidebar.text_input("Yönetici Girişi (şifre)", type="password")
-        if password == "villavilla123":  # Basit yönetici şifresi
-            st.session_state.authenticated = True
-        else:
-            st.warning("Yönetici girişini yapınız.")
-            st.stop()
-    
-    # Belgeleri yükle ve veritabanı oluştur
+    # Belgeleri yükle
     with st.spinner("Belgeler yükleniyor..."):
-        documents = load_documents()
+        documents = load_documents_from_folder("data")
+        if not documents:
+            st.error("Hiç belge bulunamadı.")
+            st.stop()
+        
         vector_db = create_vector_db(documents)
-    
-    if not vector_db:
-        st.error("Veritabanı oluşturulamadı.")
-        st.stop()
-    
-    chat_chain = create_chat_chain(vector_db)
+        if not vector_db:
+            st.error("Veritabanı oluşturulamadı.")
+            st.stop()
+        
+        chat_chain = create_chat_chain(vector_db)
     
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     
-    st.success("Sisteme başarıyla giriş yaptınız. Şimdi sorularınızı sorabilirsiniz.")
-    
-    # Sohbet geçmişini göster
+    st.success("Belgeler yüklendi, sohbet başlayabilir!")
+
     for role, message in st.session_state.chat_history:
         with st.chat_message(role):
             st.markdown(message)
     
-    # Sohbet kutusu
-    user_input = st.chat_input("Sormak istediğiniz bir şey var mı?")
+    user_input = st.chat_input("Sorunuzu yazınız...")
     
     if user_input:
         with st.chat_message("user"):
@@ -227,8 +206,7 @@ def main():
                 st.error("Yanıt üretilemedi. Lütfen tekrar deneyiniz.")
 
 # ---------------------------------------
-# 9. Uygulamayı Başlat
+# 9. Uygulama Başlatılıyor
 # ---------------------------------------
 if __name__ == "__main__":
     main()
-
