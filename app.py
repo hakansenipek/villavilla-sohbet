@@ -129,13 +129,59 @@ def create_vector_db(documents):
            embeddings = OpenAIEmbeddings()
 print("OpenAIEmbeddings başarıyla oluşturuldu")
             
-# ChromaDB vektör veritabanı oluştur - in-memory kullanarak
-vector_db = Chroma.from_documents(
-    documents=chunks,
-    embedding=embeddings,
-    # persist_directory parametresi kaldırıldı
-)
-print("Chroma vektör veritabanı in-memory olarak oluşturuldu")
+# Vektör veritabanı oluşturma
+def create_vector_db(documents):
+    """Belgelerden vektör veritabanı oluşturur - DocArrayInMemorySearch kullanarak"""
+    if not documents:
+        return None
+    
+    try:
+        # Tiktoken yüklü mü kontrol et
+        try:
+            import tiktoken
+            print(f"Tiktoken sürümü: {tiktoken.__version__}")
+        except ImportError:
+            print("Tiktoken yüklü değil! Yükleniyor...")
+            import sys
+            import subprocess
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "tiktoken"])
+            import tiktoken
+        
+        # Belgeleri uygun parçalara böl
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=800,
+            chunk_overlap=150,
+            separators=["\n\n", "\n", ". ", " ", ""],
+            length_function=len
+        )
+        chunks = splitter.split_documents(documents)
+        print(f"Belgeler {len(chunks)} parçaya bölündü")
+        
+        # API anahtarı kontrol et
+        print(f"API Anahtarı ayarlandı mı: {'OPENAI_API_KEY' in os.environ}")
+        
+        # Vektör embeddingler oluştur
+        try:
+            embeddings = OpenAIEmbeddings()
+            print("OpenAIEmbeddings başarıyla oluşturuldu")
+            
+            # DocArrayInMemorySearch vektör veritabanı oluştur
+            from langchain.vectorstores import DocArrayInMemorySearch
+            
+            vector_db = DocArrayInMemorySearch.from_documents(
+                documents=chunks,
+                embedding=embeddings,
+            )
+            print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
+            return vector_db
+            
+        except Exception as e:
+            import traceback
+            error_msg = f"Embedding oluşturma hatası: {str(e)}"
+            print(error_msg)
+            print(f"Hata detayı: {traceback.format_exc()}")
+            st.error(f"Vektör veritabanı oluşturulurken hata: {str(e)}")
+            return None
         
     except Exception as e:
         print(f"Genel hata: {str(e)}")
