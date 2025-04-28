@@ -280,7 +280,7 @@ def main():
             for package in missing_packages:
                 subprocess.check_call([sys.executable, "-m", "pip", "install", package])
             st.success("Paketler yüklendi. Sayfa yenileniyor...")
-            st.experimental_rerun()
+            st.rerun()
     
     # Test belgelerini oluştur
     with st.spinner("Belgeler hazırlanıyor..."):
