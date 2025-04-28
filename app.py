@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import FAISS
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
@@ -104,8 +104,8 @@ def create_vector_db(documents):
         # Vektör embeddingler oluştur
         embeddings = OpenAIEmbeddings()
         
-        # Vektör veritabanı oluştur
-        vector_db = Chroma.from_documents(
+        # Vektör veritabanı oluştur (Chroma yerine FAISS kullan)
+        vector_db = FAISS.from_documents(
             documents=chunks,
             embedding=embeddings,
         )
