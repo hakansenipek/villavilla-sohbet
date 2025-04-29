@@ -321,6 +321,7 @@ def main():
     
     # Google Drive doküman URL'leri
     doc_urls = {
+	"folder_id": "1E0a7mgsFnCqAjSrDifXfTqFWdgX0O9I-" 
         "gelen_faturalar": "1TfyGyepmojRdD6xd7WD73I8BEKLypwtzGOa9tvVVtPE",
         "genel_gider": "1TkQsG2f9BBIiSiIE_sI-Q2k9cNoD8PzxcSf1qq-izow",
         "personel_giderleri": "1F9xxY5VztoBi7lqH95jQ-TzOTBGH00_5y-ZbcHGZTHI",
