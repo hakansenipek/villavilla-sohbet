@@ -321,11 +321,11 @@ def main():
     
     # Google Drive doküman URL'leri
     doc_urls = { 
-        "gelen_faturalar": "1TfyGyepmojRdD6xd7WD73I8BEKLypwtzGOa9tvVVtPE",
-        "genel_gider": "1TkQsG2f9BBIiSiIE_sI-Q2k9cNoD8PzxcSf1qq-izow",
-        "personel_giderleri": "1F9xxY5VztoBi7lqH95jQ-TzOTBGH00_5y-ZbcHGZTHI",
-        "villa_villa_tanitim": "16rXwlBEkjbH2pEcUgtseuYMhvZONZkitWGhgVtNDJsY",
-        "yapilan_isler": "1D6jDry4yEeWEWpluDMqOTmqNuBc449Oc84hcVIEqf1w"
+        "gelen_faturalar": "https://docs.google.com/document/d/1TfyGyepmojRdD6xd7WD73I8BEKLypwtzGOa9tvVVtPE/edit?usp=drive_link",
+        "genel_gider": "https://docs.google.com/document/d/1TkQsG2f9BBIiSiIE_sI-Q2k9cNoD8PzxcSf1qq-izow/edit?usp=drive_link",
+        "personel_giderleri": "https://docs.google.com/document/d/1F9xxY5VztoBi7lqH95jQ-TzOTBGH00_5y-ZbcHGZTHI/edit?usp=sharing",
+        "villa_villa_tanitim": "https://docs.google.com/document/d/16rXwlBEkjbH2pEcUgtseuYMhvZONZkitWGhgVtNDJsY/edit?usp=drive_link",
+        "yapilan_isler": "https://docs.google.com/document/d/1D6jDry4yEeWEWpluDMqOTmqNuBc449Oc84hcVIEqf1w/edit?usp=drive_link"
     }
     
     # Veriler yeniden yüklensin mi?
