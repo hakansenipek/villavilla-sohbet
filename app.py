@@ -168,9 +168,10 @@ def create_vector_db(documents):
     try:
         # Belgeleri parçalara böl
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500, 
-            chunk_overlap=200,
+            chunk_size=1000, 
+            chunk_overlap=300,
             separators=["\n\n", "\n", ". ", " ", ""],
+	    is_separator_regex=False,
             length_function=len
         )
         chunks = splitter.split_documents(documents)
