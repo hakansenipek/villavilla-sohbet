@@ -1,8 +1,9 @@
-# streamlit_app.py
+# app.py
 
 import os
 import sys
 import logging
+import tempfile
 import streamlit as st
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import DocArrayInMemorySearch
@@ -14,6 +15,9 @@ from langchain.docstore.document import Document
 from docx import Document as DocxDocument
 import pandas as pd
 import time
+import io
+import requests
+import re
 
 # ---------------------------------------
 # 1. Loglama Ayarları
@@ -34,7 +38,7 @@ error_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(me
 logging.getLogger().addHandler(error_handler)
 
 # ---------------------------------------
-# 2. Streamlit Sayfa Yapısı - Geliştirilmiş
+# 2. Streamlit Sayfa Yapısı
 # ---------------------------------------
 st.set_page_config(page_title="Villa Villa Yapay Zeka", layout="wide", 
                    initial_sidebar_state="expanded")
@@ -83,86 +87,90 @@ with st.container():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------------------------
-# 3. OpenAI API Anahtarı Yönetimi (Secrets ve opsiyonel girdi)
+# 3. OpenAI API Anahtarı Yönetimi
 # ---------------------------------------
-def set_openai_api_key():
-    # Secrets'dan API anahtarını al
+def load_api_keys():
+    # OpenAI API anahtarını al
     openai_api_key = st.secrets.get("openai", {}).get("api_key", None)
+    if not openai_api_key:
+        st.error("OpenAI API anahtarı bulunamadı. Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+        logging.error("OpenAI API anahtarı bulunamadı")
+        return False
     
-    # Eğer sidebar'da API anahtarı giriş alanı istiyorsanız
-    # with st.sidebar:
-    #     user_api_key = st.text_input("OpenAI API Key (İsteğe bağlı)", 
-    #                                  type="password", 
-    #                                  help="Halihazırda bir API anahtarı tanımlanmış, bu alanı boş bırakabilirsiniz.")
-    #     if user_api_key:
-    #         openai_api_key = user_api_key
-    
-    if openai_api_key:
-        os.environ["OPENAI_API_KEY"] = openai_api_key
-        return True
-    
-    # API anahtarı bulunamadı
-    st.error("API anahtarı bulunamadı. Lütfen Streamlit Secrets ayarlarını kontrol edin.")
-    logging.error("API anahtarı bulunamadı")
-    return False
+    os.environ["OPENAI_API_KEY"] = openai_api_key
+    return True
 
 # ---------------------------------------
-# 4. Belgeleri Yükleme Fonksiyonu (Genişletilmiş - docx, txt, csv desteği)
+# 4. Google Drive Doküman İndirme
 # ---------------------------------------
-def load_documents_from_folder(folder_path="data"):
+def extract_document_id(url):
+    """Google Doküman URL'sinden doküman ID'sini çıkarır."""
+    pattern = r"/d/([a-zA-Z0-9-_]+)"
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    return None
+
+def download_google_doc_as_text(doc_url):
+    """Google Dokümanı metin olarak indirir."""
+    try:
+        doc_id = extract_document_id(doc_url)
+        if not doc_id:
+            logging.error(f"Geçersiz Google Doküman URL'si: {doc_url}")
+            return None, None
+        
+        # Google Docs'un export URL'si
+        export_url = f"https://docs.google.com/document/d/{doc_id}/export?format=txt"
+        
+        # Dokümanı indir
+        response = requests.get(export_url)
+        if response.status_code != 200:
+            logging.error(f"Doküman indirilemedi. Durum kodu: {response.status_code}")
+            return None, None
+        
+        # Dosya adını al (URL'den tahmin et)
+        file_name = f"{doc_id}.txt"
+        
+        return response.text, file_name
+        
+    except Exception as e:
+        logging.error(f"Doküman indirme hatası: {str(e)}")
+        return None, None
+
+def load_documents_from_urls(doc_urls):
+    """Verilen URL listesinden Google Dokümanları yükler."""
     documents = []
-    if not os.path.exists(folder_path):
-        st.error(f"Belge klasörü bulunamadı: {folder_path}")
-        logging.error(f"Belge klasörü bulunamadı: {folder_path}")
-        return documents
-
-    # Yükleme durumu göstergesi
-    total_files = len([f for f in os.listdir(folder_path) 
-                      if f.endswith(('.docx', '.txt', '.csv'))])
-    progress_bar = st.progress(0)
     
-    for idx, filename in enumerate(os.listdir(folder_path)):
+    # Yükleme durumu göstergesi
+    progress_bar = st.progress(0)
+    st.write(f"Google Drive'dan {len(doc_urls)} doküman yükleniyor...")
+    
+    for idx, (doc_name, doc_url) in enumerate(doc_urls.items()):
         try:
-            full_path = os.path.join(folder_path, filename)
+            # Dokümanı indir
+            doc_content, file_name = download_google_doc_as_text(doc_url)
+            if not doc_content:
+                st.warning(f"{doc_name} dokümanı indirilemedi. URL'yi kontrol edin.")
+                continue
             
-            # DOCX Belgesi
-            if filename.endswith(".docx"):
-                docx = DocxDocument(full_path)
-                text = "\n".join([p.text for p in docx.paragraphs if p.text.strip() != ""])
-                documents.append(Document(page_content=text, metadata={"source": filename}))
-                logging.info(f"Belge yüklendi: {filename}, İçerik uzunluğu: {len(text)} karakter")
+            # Dokümanı LangChain formatına dönüştür
+            documents.append(Document(
+                page_content=doc_content, 
+                metadata={"source": doc_name, "url": doc_url}
+            ))
             
-            # TXT Belgesi
-            elif filename.endswith(".txt"):
-                with open(full_path, "r", encoding="utf-8") as file:
-                    text = file.read()
-                documents.append(Document(page_content=text, metadata={"source": filename}))
-                logging.info(f"Belge yüklendi: {filename}, İçerik uzunluğu: {len(text)} karakter")
-            
-            # CSV Belgesi - Tablo verisini metin formatına dönüştürme
-            elif filename.endswith(".csv"):
-                try:
-                    df = pd.read_csv(full_path)
-                    # CSV yapısını koruyarak metin formatına dönüştürme
-                    text = f"# {filename} içeriği:\n\n"
-                    text += df.to_string(index=False) + "\n\n"
-                    # Sütun bilgilerini ekle
-                    text += f"Bu tabloda şu sütunlar bulunmaktadır: {', '.join(df.columns)}\n"
-                    documents.append(Document(page_content=text, metadata={"source": filename}))
-                    logging.info(f"CSV belgesi yüklendi: {filename}, Satır sayısı: {len(df)}")
-                except Exception as e:
-                    logging.error(f"CSV belgesi {filename} işlenirken hata: {str(e)}")
+            logging.info(f"Doküman yüklendi: {doc_name}, İçerik uzunluğu: {len(doc_content)} karakter")
             
             # İlerleme durumunu güncelle
-            progress_bar.progress((idx + 1) / total_files)
+            progress_bar.progress((idx + 1) / len(doc_urls))
             
         except Exception as e:
-            logging.error(f"{filename} yüklenirken hata: {str(e)}")
+            logging.error(f"{doc_name} işlenirken hata: {str(e)}")
     
     return documents
 
 # ---------------------------------------
-# 5. Vektör Veritabanı Oluşturma (Geliştirilmiş hata yakalama)
+# 5. Vektör Veritabanı Oluşturma
 # ---------------------------------------
 def create_vector_db(documents):
     try:
@@ -171,7 +179,7 @@ def create_vector_db(documents):
             chunk_size=2500, 
             chunk_overlap=400,
             separators=["\n\n", "\n", ". ", " ", ""],
-	    is_separator_regex=False,
+            is_separator_regex=False,
             length_function=len
         )
         chunks = splitter.split_documents(documents)
@@ -215,7 +223,7 @@ def create_vector_db(documents):
         return None
 
 # ---------------------------------------
-# 6. Özel Prompt Şablonu (Türkçe ve Bağlam Odaklı)
+# 6. Özel Prompt Şablonu
 # ---------------------------------------
 def create_qa_prompt():
     template = """
@@ -248,7 +256,7 @@ def create_qa_prompt():
     return PromptTemplate(input_variables=["context", "chat_history", "question"], template=template)
 
 # ---------------------------------------
-# 7. Chat Zinciri Kurulumu (Geliştirilmiş Parametreler)
+# 7. Chat Zinciri Kurulumu
 # ---------------------------------------
 def create_chat_chain(vector_db):
     try:
@@ -259,10 +267,10 @@ def create_chat_chain(vector_db):
             streaming=True
         )
         
-        # Değişiklik burada yapılıyor
+        # Retriever - Similarity arama ve daha fazla belge getirme
         retriever = vector_db.as_retriever(
-            search_type="similarity",  # MMR yerine similarity kullanılıyor
-            search_kwargs={"k": 20}    # Daha fazla belge getiriliyor
+            search_type="similarity",
+            search_kwargs={"k": 20}
         )
         
         qa_prompt = create_qa_prompt()
@@ -278,8 +286,9 @@ def create_chat_chain(vector_db):
     except Exception as e:
         logging.error(f"Chat zinciri hatası: {str(e)}")
         return None
+
 # ---------------------------------------
-# 8. Ana Uygulama (Geliştirilmiş Kullanıcı Arayüzü)
+# 8. Ana Uygulama
 # ---------------------------------------
 def main():
     # Sidebar bilgileri
@@ -298,34 +307,45 @@ def main():
         - Araç giderleri nelerdir?
         - Metro'dan yapılan alışverişlerin toplam tutarı nedir?
         """)
-    
-    # Global API anahtarı ayarla
-    if not set_openai_api_key():
+        
+        # Veri yenileme butonu
+        refresh_data = st.button("🔄 Verileri Yenile", use_container_width=True)
+        
+    # API anahtarlarını yükle
+    if not load_api_keys():
         st.stop()
 
     # Session state değişkenleri
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     
-    if "documents" not in st.session_state or "vector_db" not in st.session_state or "chat_chain" not in st.session_state:
+    # Google Drive doküman URL'leri
+    doc_urls = {
+        "gelen_faturalar": "https://docs.google.com/document/d/1TfyGyepmojRdD6xd7WD73I8BEKLypwtzGOa9tvVVtPE/edit",
+        "genel_gider": "https://docs.google.com/document/d/1TkQsG2f9BBIiSiIE_sI-Q2k9cNoD8PzxcSf1qq-izow/edit",
+        "personel_giderleri": "https://docs.google.com/document/d/1F9xxY5VztoBi7lqH95jQ-TzOTBGH00_5y-ZbcHGZTHI/edit",
+        "villa_villa_tanitim": "https://docs.google.com/document/d/16rXwlBEkjbH2pEcUgtseuYMhvZONZkitWGhgVtNDJsY/edit",
+        "yapilan_isler": "https://docs.google.com/document/d/1D6jDry4yEeWEWpluDMqOTmqNuBc449Oc84hcVIEqf1w/edit"
+    }
+    
+    # Veriler yeniden yüklensin mi?
+    if refresh_data or "documents" not in st.session_state:
         try:
-            # Belgeleri yükle
-            with st.spinner("Belgeler yükleniyor..."):
-                documents = load_documents_from_folder("data")
+            # Belgeleri URL'lerden yükle
+            with st.spinner("Google Drive'dan belgeler yükleniyor..."):
+                documents = load_documents_from_urls(doc_urls)
                 if not documents:
-                    st.error("Hiç belge bulunamadı! Lütfen 'data' klasörüne belgelerinizi ekleyin.")
-                    logging.error("Hiç belge bulunamadı")
+                    st.error("Hiçbir doküman yüklenemedi! URL'leri kontrol edin.")
                     st.stop()
                 
                 st.session_state.documents = documents
-                logging.info(f"Toplam {len(documents)} belge yüklendi")
+                logging.info(f"Toplam {len(documents)} belge Drive'dan yüklendi")
             
             # Vektör veritabanı oluştur
             with st.spinner("Vektör veritabanı oluşturuluyor..."):
                 vector_db = create_vector_db(documents)
                 if not vector_db:
                     st.error("Vektör veritabanı oluşturulamadı!")
-                    logging.error("Vektör veritabanı oluşturulamadı")
                     st.stop()
                 
                 st.session_state.vector_db = vector_db
@@ -335,7 +355,6 @@ def main():
                 chat_chain = create_chat_chain(vector_db)
                 if not chat_chain:
                     st.error("Sohbet sistemi oluşturulamadı!")
-                    logging.error("Sohbet sistemi oluşturulamadı")
                     st.stop()
                 
                 st.session_state.chat_chain = chat_chain
@@ -365,7 +384,7 @@ def main():
     user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
     
     # Temizleme butonları
-    cols = st.columns(4)
+    cols = st.columns(2)
     with cols[0]:
         if st.button("🧹 Sohbeti Temizle", use_container_width=True):
             st.session_state.chat_history = []
@@ -402,7 +421,7 @@ def main():
                 message_placeholder = st.empty()
                 full_response = ""
                 
-                # Düşünme animasyonu (opsiyonel)
+                # Düşünme animasyonu
                 with st.spinner("Villa Villa Asistanı düşünüyor..."):
                     response = st.session_state.chat_chain({
                         "question": user_input,
