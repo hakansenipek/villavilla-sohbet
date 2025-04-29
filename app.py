@@ -101,7 +101,7 @@ def load_api_keys():
     return True
 
 # ---------------------------------------
-# 4. Google Drive Doküman İndirme
+# 4. Google Drive Doküman İndirme (Yeni Yaklaşım)
 # ---------------------------------------
 def extract_document_id(url):
     """Google Doküman URL'sinden doküman ID'sini çıkarır."""
@@ -111,8 +111,8 @@ def extract_document_id(url):
         return match.group(1)
     return None
 
-def download_google_doc_as_text(doc_url):
-    """Google Dokümanı metin olarak indirir."""
+def download_google_doc(doc_url, file_format="docx"):
+    """Google Dokümanı doğrudan export formatında indirir."""
     try:
         doc_id = extract_document_id(doc_url)
         if not doc_id:
@@ -120,22 +120,64 @@ def download_google_doc_as_text(doc_url):
             return None, None
         
         # Google Docs'un export URL'si
-        export_url = f"https://docs.google.com/document/d/{doc_id}/export?format=txt"
+        export_url = f"https://docs.google.com/document/d/{doc_id}/export?format={file_format}"
         
         # Dokümanı indir
         response = requests.get(export_url)
+        
+        # HTTP yanıt kodunu ve içerik uzunluğunu logla
+        logging.info(f"Doküman indirme yanıtı: {response.status_code}, İçerik uzunluğu: {len(response.content)}")
+        
         if response.status_code != 200:
             logging.error(f"Doküman indirilemedi. Durum kodu: {response.status_code}")
             return None, None
         
-        # Dosya adını al (URL'den tahmin et)
-        file_name = f"{doc_id}.txt"
+        # Geçici dosya oluştur
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}")
+        temp_file.write(response.content)
+        temp_file.close()
         
-        return response.text, file_name
+        return temp_file.name, doc_id
         
     except Exception as e:
         logging.error(f"Doküman indirme hatası: {str(e)}")
         return None, None
+
+def process_document(file_path, doc_name, file_format="docx"):
+    """İndirilen dokümanı işleyerek LangChain Document nesnesine dönüştürür."""
+    try:
+        if file_format == "docx":
+            # DOCX dosyasını oku
+            docx = DocxDocument(file_path)
+            text = "\n".join([p.text for p in docx.paragraphs if p.text.strip() != ""])
+            
+            # Tablo içeriklerini de ekle
+            for table in docx.tables:
+                for row in table.rows:
+                    row_text = " | ".join([cell.text for cell in row.cells])
+                    text += f"\n{row_text}"
+            
+            return Document(page_content=text, metadata={"source": doc_name})
+            
+        elif file_format == "txt":
+            # TXT dosyasını oku
+            with open(file_path, 'r', encoding='utf-8') as file:
+                text = file.read()
+            return Document(page_content=text, metadata={"source": doc_name})
+            
+        else:
+            logging.error(f"Desteklenmeyen dosya formatı: {file_format}")
+            return None
+            
+    except Exception as e:
+        logging.error(f"Doküman işleme hatası: {str(e)}")
+        return None
+    finally:
+        # Geçici dosyayı temizle
+        try:
+            os.remove(file_path)
+        except:
+            pass
 
 def load_documents_from_urls(doc_urls):
     """Verilen URL listesinden Google Dokümanları yükler."""
@@ -145,27 +187,52 @@ def load_documents_from_urls(doc_urls):
     progress_bar = st.progress(0)
     st.write(f"Google Drive'dan {len(doc_urls)} doküman yükleniyor...")
     
+    # Başarılı ve başarısız dokümanları izle
+    successful_docs = []
+    failed_docs = []
+    
     for idx, (doc_name, doc_url) in enumerate(doc_urls.items()):
         try:
-            # Dokümanı indir
-            doc_content, file_name = download_google_doc_as_text(doc_url)
-            if not doc_content:
-                st.warning(f"{doc_name} dokümanı indirilemedi. URL'yi kontrol edin.")
-                continue
+            # İlk olarak DOCX formatında indirmeyi dene
+            file_path, doc_id = download_google_doc(doc_url, "docx")
             
-            # Dokümanı LangChain formatına dönüştür
-            documents.append(Document(
-                page_content=doc_content, 
-                metadata={"source": doc_name, "url": doc_url}
-            ))
+            # DOCX indirilemediyse, TXT formatında dene
+            if not file_path:
+                st.warning(f"{doc_name} DOCX olarak indirilemedi, TXT olarak deneniyor...")
+                file_path, doc_id = download_google_doc(doc_url, "txt")
+                
+                if not file_path:
+                    failed_docs.append(doc_name)
+                    st.error(f"{doc_name} dokümanı indirilemedi! Dokümanın paylaşım ayarlarını kontrol edin.")
+                    continue
+                
+                # TXT dosyasını işle
+                document = process_document(file_path, doc_name, "txt")
+            else:
+                # DOCX dosyasını işle
+                document = process_document(file_path, doc_name, "docx")
             
-            logging.info(f"Doküman yüklendi: {doc_name}, İçerik uzunluğu: {len(doc_content)} karakter")
+            if document:
+                documents.append(document)
+                successful_docs.append(doc_name)
+                logging.info(f"Doküman başarıyla yüklendi: {doc_name}, İçerik uzunluğu: {len(document.page_content)} karakter")
+            else:
+                failed_docs.append(doc_name)
+                st.error(f"{doc_name} dokümanı işlenemedi!")
             
             # İlerleme durumunu güncelle
             progress_bar.progress((idx + 1) / len(doc_urls))
             
         except Exception as e:
+            failed_docs.append(doc_name)
             logging.error(f"{doc_name} işlenirken hata: {str(e)}")
+    
+    # Sonuçları göster
+    if successful_docs:
+        st.success(f"Toplam {len(successful_docs)} belge başarıyla yüklendi: {', '.join(successful_docs)}")
+    
+    if failed_docs:
+        st.error(f"Toplam {len(failed_docs)} belge yüklenemedi: {', '.join(failed_docs)}")
     
     return documents
 
@@ -320,12 +387,12 @@ def main():
         st.session_state.chat_history = []
     
     # Google Drive doküman URL'leri
-    doc_urls = { 
-        "gelen_faturalar": "https://docs.google.com/document/d/1TfyGyepmojRdD6xd7WD73I8BEKLypwtzGOa9tvVVtPE/edit?usp=drive_link",
-        "genel_gider": "https://docs.google.com/document/d/1TkQsG2f9BBIiSiIE_sI-Q2k9cNoD8PzxcSf1qq-izow/edit?usp=drive_link",
-        "personel_giderleri": "https://docs.google.com/document/d/1F9xxY5VztoBi7lqH95jQ-TzOTBGH00_5y-ZbcHGZTHI/edit?usp=sharing",
-        "villa_villa_tanitim": "https://docs.google.com/document/d/16rXwlBEkjbH2pEcUgtseuYMhvZONZkitWGhgVtNDJsY/edit?usp=drive_link",
-        "yapilan_isler": "https://docs.google.com/document/d/1D6jDry4yEeWEWpluDMqOTmqNuBc449Oc84hcVIEqf1w/edit?usp=drive_link"
+    doc_urls = {
+        "gelen_faturalar": "https://docs.google.com/document/d/1TfyGyepmojRdD6xd7WD73I8BEKLypwtzGOa9tvVVtPE/edit",
+        "genel_gider": "https://docs.google.com/document/d/1TkQsG2f9BBIiSiIE_sI-Q2k9cNoD8PzxcSf1qq-izow/edit",
+        "personel_giderleri": "https://docs.google.com/document/d/1F9xxY5VztoBi7lqH95jQ-TzOTBGH00_5y-ZbcHGZTHI/edit",
+        "villa_villa_tanitim": "https://docs.google.com/document/d/16rXwlBEkjbH2pEcUgtseuYMhvZONZkitWGhgVtNDJsY/edit",
+        "yapilan_isler": "https://docs.google.com/document/d/1D6jDry4yEeWEWpluDMqOTmqNuBc449Oc84hcVIEqf1w/edit"
     }
     
     # Veriler yeniden yüklensin mi?
@@ -335,7 +402,7 @@ def main():
             with st.spinner("Google Drive'dan belgeler yükleniyor..."):
                 documents = load_documents_from_urls(doc_urls)
                 if not documents:
-                    st.error("Hiçbir doküman yüklenemedi! URL'leri kontrol edin.")
+                    st.error("Hiçbir doküman yüklenemedi! URL'leri ve dokümanların paylaşım ayarlarını kontrol edin.")
                     st.stop()
                 
                 st.session_state.documents = documents
