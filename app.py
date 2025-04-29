@@ -168,8 +168,8 @@ def create_vector_db(documents):
     try:
         # Belgeleri parçalara böl
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, 
-            chunk_overlap=300,
+            chunk_size=2500, 
+            chunk_overlap=400,
             separators=["\n\n", "\n", ". ", " ", ""],
 	    is_separator_regex=False,
             length_function=len
@@ -259,14 +259,12 @@ def create_chat_chain(vector_db):
             streaming=True
         )
         
+        # Değişiklik burada yapılıyor
         retriever = vector_db.as_retriever(
-            search_type="mmr",  # Maximum Marginal Relevance
-            search_kwargs={
-                "k": 8,  # Geri döndürülecek döküman sayısı
-                "fetch_k": 15,  # İlk sorgu için alınacak döküman sayısı
-                "lambda_mult": 0.7  # Çeşitlilik faktörü (0-1) - 0.7 dengeli
-            }
+            search_type="similarity",  # MMR yerine similarity kullanılıyor
+            search_kwargs={"k": 20}    # Daha fazla belge getiriliyor
         )
+        
         qa_prompt = create_qa_prompt()
         
         chain = ConversationalRetrievalChain.from_llm(
@@ -274,14 +272,12 @@ def create_chat_chain(vector_db):
             retriever=retriever,
             return_source_documents=True,
             combine_docs_chain_kwargs={"prompt": qa_prompt},
-            verbose=True,
-            rephrase_question=True  # Soruyu yeniden formüle et
+            verbose=True
         )
         return chain
     except Exception as e:
         logging.error(f"Chat zinciri hatası: {str(e)}")
         return None
-
 # ---------------------------------------
 # 8. Ana Uygulama (Geliştirilmiş Kullanıcı Arayüzü)
 # ---------------------------------------
