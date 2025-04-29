@@ -1,5 +1,3 @@
-# streamlit_app.py
-
 import os
 import sys
 import tempfile
@@ -74,9 +72,10 @@ def load_documents_from_folder(folder_path="data"):
                 docx = DocxDocument(full_path)
                 text = "\n".join([p.text for p in docx.paragraphs if p.text.strip() != ""])
                 documents.append(Document(page_content=text, metadata={"source": filename}))
-                logging.info(f"{filename} başarıyla yüklendi.")
+                print(f"Belge yüklendi: {filename}, İçerik uzunluğu: {len(text)} karakter")
             except Exception as e:
                 logging.error(f"{filename} yüklenirken hata: {str(e)}")
+                st.error(f"{filename} yüklenirken hata: {str(e)}")
     
     if not documents:
         st.warning("Belge bulunamadı. Örnek veri kullanılacak.")
@@ -97,33 +96,15 @@ def create_test_documents():
     Müşteri: ABC Şirketi
     Etkinlik Türü: Kurumsal Yıl Dönümü
     Kişi Sayısı: 150
-    Menü: Ana yemek (Dana Bonfile), 5 çeşit meze (Humus, Cacık, Patlıcan Salatası, Acılı Ezme, Peynir Tabağı), 2 çeşit tatlı (Profiterol, Baklava)
-    Yer: Beşiktaş Otel
+    Menü: Ana yemek, 5 çeşit meze, 2 çeşit tatlı
     Toplam Maliyet: 75,000 TL
     
     Tarih: 10 Nisan 2025
     Müşteri: XYZ Ltd.
     Etkinlik Türü: Ürün Lansmanı
     Kişi Sayısı: 80
-    Menü: Kokteyl, 10 çeşit kanape (Somon Füme, Peynirli Kraker, Mini Sandviç, Tavuk Şiş, Mini Pizza, İçli Köfte, Karides Kanepe, Sebzeli Kanepe, Meyve Çubukları, Çikolatalı Kurabiye)
-    Yer: Nişantaşı Konferans Salonu
+    Menü: Kokteyl, 10 çeşit kanape
     Toplam Maliyet: 40,000 TL
-    
-    Tarih: 5 Nisan 2025
-    Müşteri: 123 Holding
-    Etkinlik Türü: Doğum Günü Kutlaması
-    Kişi Sayısı: 30
-    Menü: Açık Büfe (Izgara Balık, Tavuk Şiş, Karışık Izgara, Salata Bar, Meze Çeşitleri, Doğum Günü Pastası)
-    Yer: Bebek Sahil Restoran
-    Toplam Maliyet: 25,000 TL
-    
-    Tarih: 28 Mart 2025
-    Müşteri: DEF AŞ
-    Etkinlik Türü: Düğün
-    Kişi Sayısı: 200
-    Menü: Düğün Menüsü (Çorba, Ana Yemek (Kuzu Tandır), Pilav, Salata, 3 Çeşit Meze, Düğün Pastası)
-    Yer: Yeniköy Düğün Salonu
-    Toplam Maliyet: 120,000 TL
     """
     
     genel_gider_content = """
@@ -134,93 +115,43 @@ def create_test_documents():
     Elektrik: 2,500 TL
     Su: 800 TL
     İnternet: 600 TL
-    Ofis Malzemeleri: 1,200 TL
-    Araç Yakıt: 3,500 TL
-    Bakım Onarım: 900 TL
-    Toplam: 24,500 TL
+    Personel Maaşları: 45,000 TL
+    Toplam: 63,900 TL
     
     Mart 2025:
     Kira: 15,000 TL
     Elektrik: 2,800 TL
     Su: 750 TL
     İnternet: 600 TL
-    Ofis Malzemeleri: 850 TL
-    Araç Yakıt: 3,200 TL
-    Bakım Onarım: 1,500 TL
-    Toplam: 24,700 TL
-    """
-    
-    personel_giderleri_content = """
-    Villa Villa Organizasyon - Personel Giderleri
-    
-    Nisan 2025:
-    Tam Zamanlı Çalışanlar (5 kişi): 35,000 TL
-    Etkinlik Görevlileri (15 etkinlik): 22,500 TL
-    SGK Ödemeleri: 12,800 TL
-    Yemek Kartı: 3,500 TL
-    Ulaşım Desteği: 2,500 TL
-    Toplam: 76,300 TL
-    
-    Mart 2025:
-    Tam Zamanlı Çalışanlar (5 kişi): 35,000 TL
-    Etkinlik Görevlileri (12 etkinlik): 18,000 TL
-    SGK Ödemeleri: 12,800 TL
-    Yemek Kartı: 3,500 TL
-    Ulaşım Desteği: 2,500 TL
-    Toplam: 71,800 TL
-    """
-    
-    gelen_faturalar_content = """
-    Villa Villa Organizasyon - Gelen Faturalar
-    
-    Nisan 2025:
-    Catering Hizmeti (ABC Catering): 25,000 TL (5 Nisan)
-    Ses ve Işık Ekipmanları (XYZ Teknik): 15,000 TL (10 Nisan) 
-    Dekorasyon Malzemeleri (Dekor AŞ): 12,000 TL (12 Nisan)
-    Baskı ve Davetiye (Matbaa Ltd): 5,000 TL (8 Nisan)
-    Çiçek Aranjmanları (Çiçekçi): 3,500 TL (15 Nisan)
-    Ulaşım Hizmeti (Transfer Co): 8,000 TL (18 Nisan)
-    Toplam: 68,500 TL
-    
-    Mart 2025:
-    Catering Hizmeti (ABC Catering): 32,000 TL (28 Mart)
-    Ses ve Işık Ekipmanları (XYZ Teknik): 18,000 TL (25 Mart)
-    Dekorasyon Malzemeleri (Dekor AŞ): 9,500 TL (15 Mart)
-    Baskı ve Davetiye (Matbaa Ltd): 7,000 TL (10 Mart)
-    Çiçek Aranjmanları (Çiçekçi): 4,200 TL (22 Mart)
-    Ulaşım Hizmeti (Transfer Co): 6,500 TL (18 Mart)
-    Toplam: 77,200 TL
+    Personel Maaşları: 45,000 TL
+    Toplam: 64,150 TL
     """
     
     doc1 = Document(page_content=yapilan_isler_content, metadata={"source": "yapilan_isler.docx"})
     doc2 = Document(page_content=genel_gider_content, metadata={"source": "genel_gider.docx"})
-    doc3 = Document(page_content=personel_giderleri_content, metadata={"source": "personel_giderleri.docx"})
-    doc4 = Document(page_content=gelen_faturalar_content, metadata={"source": "gelen_faturalar.docx"})
     
-    documents.extend([doc1, doc2, doc3, doc4])
+    documents.extend([doc1, doc2])
     return documents
 
 # ---------------------------------------
-# 6. Vektör Veritabanı Oluşturma
+# 6. Vektör Veritabanı (DocArrayInMemorySearch)
 # ---------------------------------------
 def create_vector_db(documents):
     try:
-        # Belgeleri parçalara böl - daha büyük parçalar ve daha fazla örtüşme
+        # Belgeleri parçalara böl - Daha büyük chunk boyutu ve daha fazla overlap
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1500,  # Daha büyük chunk boyutu
-            chunk_overlap=250,  # Daha fazla örtüşme
+            chunk_size=1500,  # 800'den 1500'e artırıldı
+            chunk_overlap=200,  # 150'den 200'e artırıldı
             separators=["\n\n", "\n", ". ", " ", ""],
             length_function=len
         )
         chunks = splitter.split_documents(documents)
         st.info(f"Belgeler {len(chunks)} parçaya bölündü")
         
-        # Yüklenen belgelerin bir kısmını göster
-        with st.expander("Yüklenen Belgeler", expanded=False):
-            for doc in documents:
-                st.markdown(f"**{doc.metadata.get('source', 'Bilinmeyen')}**")
-                st.text(doc.page_content[:300] + "...")
-                st.markdown("---")
+        # Debugging - Her chunk'ın ilk 100 karakterini göster
+        print(f"İlk 3 chunk örneği:")
+        for i, chunk in enumerate(chunks[:3]):
+            print(f"Chunk {i+1}: {chunk.page_content[:100]}...")
         
         # Embeddings oluştur
         try:
@@ -243,7 +174,7 @@ def create_vector_db(documents):
                 documents=chunks,
                 embedding=embeddings,
             )
-            print("Vektör veritabanı başarıyla oluşturuldu")
+            print("DocArrayInMemorySearch vektör veritabanı başarıyla oluşturuldu")
             return vector_db
             
         except Exception as e:
@@ -260,53 +191,28 @@ def create_vector_db(documents):
         return None
 
 # ---------------------------------------
-# 7. Gelişmiş Prompt Şablonu
+# 7. Özel Prompt Şablonu
 # ---------------------------------------
 def create_qa_prompt():
     template = """
-    Sen Villa Villa organizasyon şirketinin yapay zekâ destekli finans ve operasyon asistanısın.
-    
-    Villa Villa Yapay Zeka Destekli Chatbot Çalışma Sistemine göre yanıt vermelisin:
-    
-    1. Tarih ve Yapılan İş Bilgisi Sorguları:
-       - Yapılan işler tarih bazlı sorgulandığında, bilgi "yapilan_isler.docx" adlı dosya üzerinden alınır.
-       - En güncel iş, tarih sıralamasına göre tespit edilir ve detaylarıyla sunulur.
-    
-    2. Yapılan İşlere Göre Maliyet Hesaplama:
-       - Talep edilen işle ilgili maliyet çıkarılırken "yapilan_isler.docx" dosyasındaki işletme ve hizmet detayları temel alınır.
-       - İşin türü, kişi sayısı, menü içeriği ve yer bilgileri dikkate alınarak değerlendirme yapılır.
-    
-    3. Aylık Gider ve Maliyet Analizi:
-       - Belirli bir aya ilişkin gider sorgularında dört dosya birlikte değerlendirilir:
-         * "genel_gider.docx" - Ofis ve temel giderler
-         * "personel_giderleri.docx" - Çalışan maaşları ve ödemeleri
-         * "gelen_faturalar.docx" - Tedarikçilerden gelen faturalar
-         * "yapilan_isler.docx" - Tamamlanan işler ve gelirleri
-       - Bu dosyalar doğrultusunda, tedarikçi giderleri, fatura kalemleri ve iş bazlı maliyetler birleştirilerek kapsamlı bir analiz yapılır.
-    
-    4. Menü Teklifi Oluşturma:
-       - Menü teklifi istenen işlerde, "yapilan_isler.docx" dosyasında yer alan örnek menüler incelenir.
-       - İşin niteliği (açılış, davet, kurumsal vb.) ve kişi sayısı göz önünde bulundurularak benzer işler temel alınır, uygun menü önerisi hazırlanır.
-    
-    Aşağıdaki bilgiler doğrultusunda müşterinin sorusunu yanıtla:
-    
+    Sen Villa Villa şirketinin finans ve operasyon asistanısın. Aşağıdaki belgelerden alınan bilgilere dayanarak soruları yanıtla:
+
     Belgelerden Bilgiler:
     {context}
-    
+
     Sohbet Geçmişi:
     {chat_history}
-    
+
     Soru:
     {question}
-    
-    Yanıtında şu noktalara dikkat et:
-    - Yalnızca belgedeki gerçek bilgileri kullan ve belge isimlerini referans ver
-    - İlgili belgede yanıt yoksa, hangi belgenin bu bilgiyi içermesi gerektiğini belirt
-    - Tarih bazlı sorularda en güncel bilgileri öncelikle göster
-    - Hesaplama gerektiren yanıtlarda detaylı olarak her kalemi göster
-    - Sayısal verileri tablolar ile düzenli biçimde sun
-    - Profesyonel, açık ve kibar bir dil kullan
-    
+
+    Notlar:
+    - Yanıtını verirken belgelerdeki bilgileri kullan.
+    - Bilgi şu dosyalarda bulunabilir: gelen_faturalar.docx, genel_gider.docx, personel_giderleri.docx ve yapilan_isler.docx
+    - Eğer belgede yanıt yoksa açıkça belirt.
+    - Sayısal hesaplamalar yapabilir, toplam giderleri hesaplayabilirsin.
+    - Detaylı ve kapsamlı yanıt ver.
+
     Yanıt:
     """
     return PromptTemplate(input_variables=["context", "chat_history", "question"], template=template)
@@ -321,12 +227,11 @@ def create_chat_chain(vector_db):
             model_name="gpt-4-turbo"  # Güncel model adı
         )
         
-        # Gelişmiş retriever - MMR arama ve daha fazla belge
+        # MMR arama algoritması ve daha fazla belge getirme
         retriever = vector_db.as_retriever(
-            search_type="mmr",  # Maximum Marginal Relevance - daha çeşitli sonuçlar
+            search_type="mmr",  # Maximum Marginal Relevance - benzer ancak farklı belgeler getirir
             search_kwargs={"k": 8, "fetch_k": 15}  # Daha fazla belge getir
         )
-        
         qa_prompt = create_qa_prompt()
         
         chain = ConversationalRetrievalChain.from_llm(
@@ -345,6 +250,17 @@ def create_chat_chain(vector_db):
 # 9. Ana Uygulama
 # ---------------------------------------
 def main():
+    # Streamlit önbelleğini temizle
+    # Bu, her uygulama başlangıcında önbelleği temizler
+    try:
+        st.cache_data.clear()
+    except:
+        pass
+    try:
+        st.cache_resource.clear()
+    except:
+        pass
+    
     # Global API anahtarı ayarla (sadece Secrets'dan)
     if not set_openai_api_key():
         st.stop()
@@ -355,24 +271,21 @@ def main():
     # Sidebar - Ayarlar
     with st.sidebar:
         st.header("Ayarlar")
-        use_test_data = st.checkbox("Test verileri kullan", value=True)
+        use_test_data = st.checkbox("Test verileri kullan", value=False)  # Varsayılan olarak gerçek verileri kullan
         
         # Temizle butonu
         if st.button("Sohbeti Temizle"):
             st.session_state.chat_history = []
             st.rerun()
-            
-        # Önbelleği temizleme butonu
-        if st.button("Önbelleği Temizle"):
+        
+        # Önbelleği temizle butonu
+        if st.button("🧹 Önbelleği Temizle"):
             try:
                 st.cache_data.clear()
-            except:
-                pass
-            try:
                 st.cache_resource.clear()
+                st.success("Önbellek temizlendi!")
             except:
-                pass
-            st.success("Önbellek temizlendi!")
+                st.error("Önbellek temizlenirken hata oluştu.")
             st.rerun()
     
     # Belgeler ve vektör veritabanı
@@ -383,10 +296,17 @@ def main():
                 st.info("Test belgeleri kullanılıyor")
             else:
                 documents = load_documents_from_folder("data")
+                st.success("Gerçek belgeler yüklendi")
                 
             if not documents:
                 st.error("Hiç belge bulunamadı!")
                 st.stop()
+            
+            # İşlenen belgeleri göster
+            st.subheader("Yüklenen Belgeler")
+            for doc in documents:
+                with st.expander(f"{doc.metadata.get('source', 'Bilinmeyen')}"):
+                    st.text(doc.page_content[:500] + ("..." if len(doc.page_content) > 500 else ""))
             
             vector_db = create_vector_db(documents)
             if not vector_db:
@@ -400,29 +320,12 @@ def main():
                 
         except Exception as e:
             logging.error(f"Sistem hazırlama hatası: {str(e)}")
-            st.error("Sistem hazırlanırken bir hata oluştu!")
+            st.error(f"Sistem hazırlanırken bir hata oluştu: {str(e)}")
             st.stop()
     
-    # Açıklama ekranı
-    st.markdown("""
-    ### 🤖 Villa Villa Yapay Zeka Asistanıyla Neler Yapabilirsiniz?
-    
-    **1. Tarih ve İş Bilgisi Sorguları:**
-    - "15 Nisan'da hangi etkinlik düzenlendi?"
-    - "Son yapılan etkinliğin detaylarını göster."
-    
-    **2. Maliyet Hesaplama:**
-    - "100 kişilik bir kurumsal etkinliğin maliyeti ne olur?"
-    - "Düğün organizasyonu için ortalama maliyet nedir?"
-    
-    **3. Aylık Analiz:**
-    - "Nisan ayı toplam giderleri nelerdir?"
-    - "Mart ve Nisan ayları arasında gider farkı ne kadar?"
-    
-    **4. Menü Önerileri:**
-    - "50 kişilik doğum günü için menü önerisi verir misin?"
-    - "Kurumsal lansman için kokteyl menüsü nasıl olmalı?"
-    """)
+    # Sohbet arayüzü başlığı
+    st.subheader("💬 Sorunuzu Sorun")
+    st.write("Sistemde yüklenen belgeler hakkında soru sorabilirsiniz. Örneğin: 'Nisan ayı giderleri nedir?' veya 'Son yapılan etkinliğin maliyeti nedir?'")
     
     # Sohbet geçmişini görüntüle
     for i in range(0, len(st.session_state.chat_history), 2):
