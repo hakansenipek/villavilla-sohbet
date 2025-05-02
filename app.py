@@ -5,6 +5,8 @@ import sys
 import logging
 import tempfile
 import streamlit as st
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import DocArrayInMemorySearch
 from langchain.embeddings import OpenAIEmbeddings
