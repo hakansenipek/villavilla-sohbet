@@ -607,12 +607,11 @@ def main():
     st.session_state.chat_history.append(("user", user_input))
     
         try:
-            # Bu satır ve sonraki tüm satırlar girintili olmalı
             chat_formatted = []
-            for i in range(0, len(st.session_state.chat_history)-1, 2):
-                if i+1 < len(st.session_state.chat_history):
-                     chat_formatted.append((st.session_state.chat_history[i][1], 
-                                         st.session_state.chat_history[i+1][1]))
+        for i in range(0, len(st.session_state.chat_history)-1, 2):
+            if i+1 < len(st.session_state.chat_history):
+                chat_formatted.append((st.session_state.chat_history[i][1], 
+                                    st.session_state.chat_history[i+1][1]))
         
         # Yanıt oluşturma kodları...
         
