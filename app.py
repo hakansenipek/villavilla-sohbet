@@ -627,21 +627,35 @@ def main():
                     chat_formatted.append((st.session_state.chat_history[i][1], 
                                         st.session_state.chat_history[i+1][1]))
             
-            # Yanıt oluştur
-            message_placeholder = st.empty()
-            with st.chat_message("assistant", avatar="🏛️"):
-                message_placeholder = st.empty()
-                full_response = ""
+           # Yanıt oluştur
+message_placeholder = st.empty()
+with st.chat_message("assistant", avatar="🏛️"):
+    message_placeholder = st.empty()
+    full_response = ""
+    
+    # Düşünme animasyonu
+    with st.spinner("Villa Villa Asistanı düşünüyor..."):
+        try:
+            response = st.session_state.chat_chain({
+                "question": user_input,
+                "chat_history": chat_formatted
+            })
+            full_response = response["answer"]
+            
+            # Kaynakları logla
+            if "source_documents" in response:
+                sources = [doc.metadata.get("source", "Bilinmeyen Kaynak") 
+                          for doc in response["source_documents"]]
+                logging.info(f"Yanıt kaynakları: {set(sources)}")
                 
-                # Düşünme animasyonu
-                with st.spinner("Villa Villa Asistanı düşünüyor..."):
-                    response = st.session_state.chat_chain({
-                        "question": user_input,
-                        "chat_history": chat_formatted
-                    })
-                    full_response = response["answer"]
-                    
-                    # Kaynakları logla
-                    if "source_documents" in response:
-                        sources = [doc.metadata.get("source", "Bilinmeyen Kaynak") 
-                                for doc in response["source_documents"]]
+            # Yanıtı göster
+            message_placeholder.markdown(full_response)
+        
+        except Exception as e:
+            error_msg = f"Yanıt oluşturma hatası: {str(e)}"
+            logging.error(error_msg)
+            message_placeholder.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu.")
+            full_response = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
+    
+# Yanıtı geçmişe ekle
+st.session_state.chat_history.append(("assistant", full_response))
