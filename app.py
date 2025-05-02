@@ -200,7 +200,8 @@ def load_documents_from_urls(doc_urls):
     
     # Yükleme durumu göstergesi
     progress_bar = st.progress(0)
-    st.write(f"Google Drive'dan {len(doc_urls)} doküman yükleniyor...")
+    
+(f"Google Drive'dan {len(doc_urls)} doküman yükleniyor...")
     
     # Başarılı ve başarısız dokümanları izle
     successful_docs = []
@@ -624,6 +625,18 @@ if user_input:
 # ---------------------------------------
 # 9. Uygulama Başlatılıyor
 # ---------------------------------------
+def main():
+    # DEBUG: Pinecone secrets kontrolü
+    st.write("Pinecone secrets debug:", st.secrets.get("pinecone", {}))
+
+    # Sidebar bilgileri
+    with st.sidebar:
+        st.subheader("Villa Villa Asistan Hakkında")
+        st.info("""Bu yapay zeka asistanı, Villa Villa şirketinin finansal ve 
+        operasyonel bilgilerine dayanarak sorularınızı yanıtlamak için tasarlanmıştır.
+        Tedarikçi bilgileri, gider analizleri, personel bilgileri ve daha fazlası 
+        hakkında sorular sorabilirsiniz.""")
+
 if __name__ == "__main__":
     try:
         main()
