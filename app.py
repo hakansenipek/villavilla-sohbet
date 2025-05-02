@@ -569,16 +569,16 @@ def main():
             st.stop()
     
 # Sohbet geçmişini görüntüle
-    chat_container = st.container()
-    with chat_container:
-        for i in range(0, len(st.session_state.chat_history), 2):
-            if i < len(st.session_state.chat_history):
-                with st.chat_message("user", avatar="👤"):
-                    st.markdown(st.session_state.chat_history[i][1])
-            
-            if i+1 < len(st.session_state.chat_history):
-                with st.chat_message("assistant", avatar="🏛️"):
-                    st.markdown(st.session_state.chat_history[i+1][1])
+chat_container = st.container()
+with chat_container:
+    for i in range(0, len(st.session_state.chat_history), 2):
+        if i < len(st.session_state.chat_history):
+            with st.chat_message("user", avatar="👤"):
+                st.markdown(st.session_state.chat_history[i][1])
+        
+        if i+1 < len(st.session_state.chat_history):
+            with st.chat_message("assistant", avatar="🏛️"):
+                st.markdown(st.session_state.chat_history[i+1][1])
 
 # Kullanıcı girişi
 user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
