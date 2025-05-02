@@ -592,7 +592,7 @@ def main():
                 with st.chat_message("assistant", avatar="🏛️"):
                     st.markdown(st.session_state.chat_history[i+1][1])
     
-    # Kullanıcı girişi
+# Kullanıcı girişi
 user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
 
 # Temizleme butonları
