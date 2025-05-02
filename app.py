@@ -15,8 +15,8 @@ from langchain.docstore.document import Document
 from docx import Document as DocxDocument
 import pandas as pd
 import time
-import io
-import requests
+import pinecone
+from langchain_pinecone import PineconeVectorStore
 import re
 
 # ---------------------------------------
@@ -87,7 +87,7 @@ with st.container():
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------------------------
-# 3. OpenAI API Anahtarı Yönetimi
+# 3. API Anahtarları Yönetimi
 # ---------------------------------------
 def load_api_keys():
     # OpenAI API anahtarını al
@@ -97,11 +97,25 @@ def load_api_keys():
         logging.error("OpenAI API anahtarı bulunamadı")
         return False
     
+    # Pinecone API anahtarını al
+    pinecone_api_key = st.secrets.get("pinecone", {}).get("api_key", None)
+    pinecone_environment = st.secrets.get("pinecone", {}).get("environment", None)
+    pinecone_index_name = st.secrets.get("pinecone", {}).get("index_name", None)
+    
+    if not pinecone_api_key or not pinecone_environment or not pinecone_index_name:
+        st.error("Pinecone API bilgileri eksik. Lütfen Streamlit Secrets ayarlarını kontrol edin.")
+        logging.error("Pinecone API bilgileri eksik")
+        return False
+    
     os.environ["OPENAI_API_KEY"] = openai_api_key
+    os.environ["PINECONE_API_KEY"] = pinecone_api_key
+    os.environ["PINECONE_ENVIRONMENT"] = pinecone_environment
+    os.environ["PINECONE_INDEX_NAME"] = pinecone_index_name
+    
     return True
 
 # ---------------------------------------
-# 4. Google Drive Doküman İndirme (Yeni Yaklaşım)
+# 4. Google Drive Doküman İndirme
 # ---------------------------------------
 def extract_document_id(url):
     """Google Doküman URL'sinden doküman ID'sini çıkarır."""
@@ -123,6 +137,7 @@ def download_google_doc(doc_url, file_format="docx"):
         export_url = f"https://docs.google.com/document/d/{doc_id}/export?format={file_format}"
         
         # Dokümanı indir
+        import requests
         response = requests.get(export_url)
         
         # HTTP yanıt kodunu ve içerik uzunluğunu logla
@@ -237,10 +252,57 @@ def load_documents_from_urls(doc_urls):
     return documents
 
 # ---------------------------------------
-# 5. Vektör Veritabanı Oluşturma
+# 5. Pinecone Vektör Veritabanı İşlemleri
 # ---------------------------------------
-def create_vector_db(documents):
+def init_pinecone():
+    """Pinecone'u başlatır ve varsa indeksi döndürür."""
     try:
+        # Pinecone API bilgilerini al
+        api_key = os.environ.get("PINECONE_API_KEY")
+        environment = os.environ.get("PINECONE_ENVIRONMENT")
+        index_name = os.environ.get("PINECONE_INDEX_NAME")
+        
+        if not api_key or not environment or not index_name:
+            st.error("Pinecone API bilgileri eksik.")
+            return None, None
+        
+        # Pinecone'u başlat
+        pinecone.init(api_key=api_key, environment=environment)
+        
+        # İndeksi kontrol et, yoksa oluştur
+        if index_name not in pinecone.list_indexes():
+            st.info(f"Pinecone indeksi '{index_name}' bulunamadı, oluşturuluyor...")
+            # OpenAI embedding modeli için 1536 boyut kullanılır
+            pinecone.create_index(
+                name=index_name,
+                dimension=1536,
+                metric="cosine"
+            )
+            st.success(f"Pinecone indeksi '{index_name}' başarıyla oluşturuldu.")
+            
+        # İndekse bağlan
+        index = pinecone.Index(index_name)
+        
+        return index, index_name
+        
+    except Exception as e:
+        st.error(f"Pinecone başlatma hatası: {str(e)}")
+        logging.error(f"Pinecone başlatma hatası: {str(e)}")
+        return None, None
+
+def create_or_update_vector_db(documents, namespace="villa_villa"):
+    """Belgeleri Pinecone'a ekler veya günceller."""
+    try:
+        # OpenAI embeddings oluştur
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-small"
+        )
+        
+        # Pinecone'u başlat
+        index, index_name = init_pinecone()
+        if not index or not index_name:
+            return None
+        
         # Belgeleri parçalara böl
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=2500, 
@@ -252,41 +314,82 @@ def create_vector_db(documents):
         chunks = splitter.split_documents(documents)
         logging.info(f"Belgeler {len(chunks)} parçaya bölündü")
         
-        # Chunk örneklerini ve veri dağılımını logla
-        if chunks:
-            logging.info(f"Örnek chunk içeriği (ilk 200 karakter): {chunks[0].page_content[:200]}")
-            chunk_lengths = [len(chunk.page_content) for chunk in chunks]
-            logging.info(f"Chunk uzunluk istatistikleri - Min: {min(chunk_lengths)}, Max: {max(chunk_lengths)}, Ortalama: {sum(chunk_lengths)/len(chunk_lengths)}")
+        # Namespace'teki mevcut vektörleri temizle
+        stats = index.describe_index_stats()
+        if namespace in stats.get("namespaces", {}):
+            st.info(f"Pinecone namespace '{namespace}' temizleniyor...")
+            # Mevcut namespace vektörlerini temizle
+            # Not: Bu işlem büyük indekslerde zaman alabilir
+            ids_to_delete = index.query(
+                vector=[0] * 1536,  # Kukla vektör
+                namespace=namespace,
+                top_k=10000,  # Maksimum ID sayısı
+                include_metadata=False,
+                include_values=False
+            )
+            id_list = [item.id for item in ids_to_delete.matches]
+            if id_list:
+                index.delete(ids=id_list, namespace=namespace)
+                st.success(f"Namespace '{namespace}' temizlendi, {len(id_list)} vektör silindi.")
         
-        # Embeddings oluştur
-        try:
-            api_key = os.environ.get("OPENAI_API_KEY", "")
-            if not api_key:
-                logging.error("API anahtarı bulunamadı!")
-                return None
-                
-            embeddings = OpenAIEmbeddings(
-                model="text-embedding-3-small"
-            )
-            logging.info("OpenAIEmbeddings başarıyla oluşturuldu")
+        # Vektör veritabanı oluştur
+        with st.spinner(f"Vektörler Pinecone'a yükleniyor ({len(chunks)} parça)..."):
+            text_field = "text"  # Metin alanının adı
             
-            # Vektör veritabanı oluştur
-            vector_db = DocArrayInMemorySearch.from_documents(
-                documents=chunks,
+            vectorstore = PineconeVectorStore(
+                index=index,
                 embedding=embeddings,
+                text_field=text_field,
+                namespace=namespace
             )
-            logging.info(f"Vektör veritabanı başarıyla oluşturuldu, {len(chunks)} adet vektör içeriyor")
-            return vector_db
             
-        except Exception as e:
-            import traceback
-            error_msg = f"Embedding hatası: {str(e)}"
-            logging.error(error_msg)
-            logging.error(f"Hata detayı: {traceback.format_exc()}")
-            return None
+            # Parçaları ekle
+            vectorstore.add_documents(chunks)
+            
+            st.success(f"Vektörler Pinecone'a başarıyla yüklendi!")
+            
+            return vectorstore
             
     except Exception as e:
-        logging.error(f"Vektör veritabanı hatası: {str(e)}")
+        st.error(f"Vektör veritabanı oluşturma hatası: {str(e)}")
+        logging.error(f"Vektör veritabanı oluşturma hatası: {str(e)}")
+        return None
+
+def load_vector_db_from_pinecone(namespace="villa_villa"):
+    """Pinecone'dan vektör veritabanını yükler."""
+    try:
+        # OpenAI embeddings oluştur
+        embeddings = OpenAIEmbeddings(
+            model="text-embedding-3-large"
+        )
+        
+        # Pinecone'u başlat
+        index, index_name = init_pinecone()
+        if not index or not index_name:
+            return None
+        
+        # İndeks istatistiklerini kontrol et
+        stats = index.describe_index_stats()
+        if namespace not in stats.get("namespaces", {}) or stats["namespaces"][namespace]["vector_count"] == 0:
+            st.warning(f"Pinecone'da '{namespace}' namespace'inde veri bulunamadı. Lütfen önce verileri yükleyin.")
+            return None
+        
+        # Pinecone vektör deposunu yükle
+        vectorstore = PineconeVectorStore(
+            index=index,
+            embedding=embeddings,
+            text_field="text",
+            namespace=namespace
+        )
+        
+        vector_count = stats["namespaces"][namespace]["vector_count"]
+        st.success(f"Pinecone vektör veritabanı başarıyla yüklendi! Toplam {vector_count} vektör bulundu.")
+        
+        return vectorstore
+        
+    except Exception as e:
+        st.error(f"Pinecone'dan vektör veritabanı yükleme hatası: {str(e)}")
+        logging.error(f"Pinecone'dan vektör veritabanı yükleme hatası: {str(e)}")
         return None
 
 # ---------------------------------------
@@ -375,6 +478,26 @@ def main():
         - Metro'dan yapılan alışverişlerin toplam tutarı nedir?
         """)
         
+        # Veri yükleme ayarları
+        st.subheader("Veri Yönetimi")
+        load_option = st.radio(
+            "Veri kaynağını seçin:",
+            ["Pinecone'dan Yükle", "Google Drive'dan Yükle ve Pinecone'a Kaydet"]
+        )
+        
+        if load_option == "Google Drive'dan Yükle ve Pinecone'a Kaydet":
+            custom_namespace = st.text_input(
+                "Pinecone namespace (isteğe bağlı)",
+                value="villa_villa",
+                help="Vektörlerin kaydedileceği namespace adı"
+            )
+        else:
+            custom_namespace = st.text_input(
+                "Pinecone namespace (isteğe bağlı)",
+                value="villa_villa",
+                help="Yüklenecek vektörlerin bulunduğu namespace adı"
+            )
+        
         # Veri yenileme butonu
         refresh_data = st.button("🔄 Verileri Yenile", use_container_width=True)
         
@@ -396,30 +519,39 @@ def main():
     }
     
     # Veriler yeniden yüklensin mi?
-    if refresh_data or "documents" not in st.session_state:
+    if refresh_data or "vector_db" not in st.session_state:
         try:
-            # Belgeleri URL'lerden yükle
-            with st.spinner("Google Drive'dan belgeler yükleniyor..."):
-                documents = load_documents_from_urls(doc_urls)
-                if not documents:
-                    st.error("Hiçbir doküman yüklenemedi! URL'leri ve dokümanların paylaşım ayarlarını kontrol edin.")
-                    st.stop()
+            if load_option == "Google Drive'dan Yükle ve Pinecone'a Kaydet":
+                # Google Drive'dan belgeleri yükle
+                with st.spinner("Google Drive'dan belgeler yükleniyor..."):
+                    documents = load_documents_from_urls(doc_urls)
+                    if not documents:
+                        st.error("Hiçbir doküman yüklenemedi! URL'leri ve dokümanların paylaşım ayarlarını kontrol edin.")
+                        st.stop()
+                    
+                    logging.info(f"Toplam {len(documents)} belge Drive'dan yüklendi")
                 
-                st.session_state.documents = documents
-                logging.info(f"Toplam {len(documents)} belge Drive'dan yüklendi")
-            
-            # Vektör veritabanı oluştur
-            with st.spinner("Vektör veritabanı oluşturuluyor..."):
-                vector_db = create_vector_db(documents)
-                if not vector_db:
-                    st.error("Vektör veritabanı oluşturulamadı!")
-                    st.stop()
-                
-                st.session_state.vector_db = vector_db
+                # Vektör veritabanı oluştur ve Pinecone'a kaydet
+                with st.spinner("Vektör veritabanı oluşturuluyor ve Pinecone'a kaydediliyor..."):
+                    vector_db = create_or_update_vector_db(documents, namespace=custom_namespace)
+                    if not vector_db:
+                        st.error("Vektör veritabanı oluşturulamadı!")
+                        st.stop()
+                    
+                    st.session_state.vector_db = vector_db
+            else:
+                # Pinecone'dan var olan veritabanını yükle
+                with st.spinner("Pinecone'dan vektör veritabanı yükleniyor..."):
+                    vector_db = load_vector_db_from_pinecone(namespace=custom_namespace)
+                    if not vector_db:
+                        st.error("Pinecone'dan vektör veritabanı yüklenemedi! Önce verileri yüklediğinizden emin olun.")
+                        st.stop()
+                    
+                    st.session_state.vector_db = vector_db
             
             # Chat zinciri oluştur
             with st.spinner("Sohbet sistemi hazırlanıyor..."):
-                chat_chain = create_chat_chain(vector_db)
+                chat_chain = create_chat_chain(st.session_state.vector_db)
                 if not chat_chain:
                     st.error("Sohbet sistemi oluşturulamadı!")
                     st.stop()
@@ -507,19 +639,3 @@ def main():
             
             # Yanıtı geçmişe ekle
             st.session_state.chat_history.append(("assistant", full_response))
-            
-        except Exception as e:
-            logging.error(f"Yanıt hatası: {str(e)}")
-            with st.chat_message("assistant", avatar="🏛️"):
-                st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu. Lütfen tekrar deneyin veya sorunuzu farklı bir şekilde sorun.")
-            st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."))
-
-# ---------------------------------------
-# 9. Uygulama Başlatılıyor
-# ---------------------------------------
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logging.critical(f"Kritik uygulama hatası: {str(e)}")
-        st.error("Beklenmeyen bir hata oluştu. Lütfen logs klasörünü kontrol edin veya uygulamayı yeniden başlatın.")
