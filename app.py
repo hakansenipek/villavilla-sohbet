@@ -197,37 +197,36 @@ def process_document(file_path, doc_name, file_format="docx"):
 def load_documents_from_urls(doc_urls):
     """Verilen URL listesinden Google Dokümanları yükler."""
     documents = []
-    
+
     # Yükleme durumu göstergesi
     progress_bar = st.progress(0)
-    
-(f"Google Drive'dan {len(doc_urls)} doküman yükleniyor...")
-    
+    st.write(f"Google Drive'dan {len(doc_urls)} doküman yükleniyor...")
+
     # Başarılı ve başarısız dokümanları izle
     successful_docs = []
     failed_docs = []
-    
+
     for idx, (doc_name, doc_url) in enumerate(doc_urls.items()):
         try:
             # İlk olarak DOCX formatında indirmeyi dene
             file_path, doc_id = download_google_doc(doc_url, "docx")
-            
+
             # DOCX indirilemediyse, TXT formatında dene
             if not file_path:
                 st.warning(f"{doc_name} DOCX olarak indirilemedi, TXT olarak deneniyor...")
                 file_path, doc_id = download_google_doc(doc_url, "txt")
-                
+
                 if not file_path:
                     failed_docs.append(doc_name)
                     st.error(f"{doc_name} dokümanı indirilemedi! Dokümanın paylaşım ayarlarını kontrol edin.")
                     continue
-                
+
                 # TXT dosyasını işle
                 document = process_document(file_path, doc_name, "txt")
             else:
                 # DOCX dosyasını işle
                 document = process_document(file_path, doc_name, "docx")
-            
+
             if document:
                 documents.append(document)
                 successful_docs.append(doc_name)
@@ -235,21 +234,22 @@ def load_documents_from_urls(doc_urls):
             else:
                 failed_docs.append(doc_name)
                 st.error(f"{doc_name} dokümanı işlenemedi!")
-            
+
             # İlerleme durumunu güncelle
             progress_bar.progress((idx + 1) / len(doc_urls))
-            
+
         except Exception as e:
             failed_docs.append(doc_name)
             logging.error(f"{doc_name} işlenirken hata: {str(e)}")
-    
+            st.error(f"{doc_name} için beklenmeyen bir hata oluştu.")
+
     # Sonuçları göster
     if successful_docs:
         st.success(f"Toplam {len(successful_docs)} belge başarıyla yüklendi: {', '.join(successful_docs)}")
-    
+
     if failed_docs:
         st.error(f"Toplam {len(failed_docs)} belge yüklenemedi: {', '.join(failed_docs)}")
-    
+
     return documents
 
 # ---------------------------------------
