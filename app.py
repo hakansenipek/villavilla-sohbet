@@ -598,7 +598,7 @@ def main():
             st.session_state.chat_history = chat_history
             st.rerun()
     
-    if user_input:
+        if user_input:
     logging.info(f"Kullanıcı sorusu: {user_input}")
 
     with st.chat_message("user", avatar="👤"):
@@ -645,8 +645,4 @@ def main():
         with st.chat_message("assistant", avatar="🏩"):
             st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu. Lütfen tekrar deneyin veya sorunuzu farklı bir şekilde sorun.")
         st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."))
-
-
-
-
-
+   
