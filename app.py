@@ -1,5 +1,3 @@
-# app.py
-
 import os
 import sys
 import logging
@@ -592,67 +590,58 @@ def main():
                 with st.chat_message("assistant", avatar="🏛️"):
                     st.markdown(st.session_state.chat_history[i+1][1])
     
-# Kullanıcı girişi
-user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
-
-# Temizleme butonları
-cols = st.columns(2)
-with cols[0]:
-    if st.button("🧹 Sohbeti Temizle", use_container_width=True):
-        st.session_state.chat_history = []
-        st.rerun()
-with cols[1]:
-    if st.button("🔄 Önbelleği Yenile", use_container_width=True):
-        chat_history = st.session_state.chat_history
-        for key in list(st.session_state.keys()):
-            if key != "chat_history":
-                del st.session_state[key]
-        st.session_state.chat_history = chat_history
-        st.rerun()
-
-if user_input:
-    logging.info(f"Kullanıcı sorusu: {user_input}")
+    # Kullanıcı girişi
+    user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
     
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(user_input)
+    # Temizleme butonları
+    cols = st.columns(2)
+    with cols[0]:
+        if st.button("🧹 Sohbeti Temizle", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
+    with cols[1]:
+        if st.button("🔄 Önbelleği Yenile", use_container_width=True):
+            # Sadece sohbet geçmişini koruyarak sistemi yenile
+            chat_history = st.session_state.chat_history
+            for key in list(st.session_state.keys()):
+                if key != "chat_history":
+                    del st.session_state[key]
+            st.session_state.chat_history = chat_history
+            st.rerun()
     
-    st.session_state.chat_history.append(("user", user_input))
-
-    try:
-        # Sohbet geçmişini uygun formata dönüştür
-        chat_formatted = []
-        for i in range(0, len(st.session_state.chat_history)-1, 2):
-            if i+1 < len(st.session_state.chat_history):
-                chat_formatted.append((st.session_state.chat_history[i][1],
-                                       st.session_state.chat_history[i+1][1]))
-
-        # Yanıt oluştur
-        message_placeholder = st.empty()
-        with st.chat_message("assistant", avatar="🏛️"):
+    if user_input:
+        logging.info(f"Kullanıcı sorusu: {user_input}")
+        
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(user_input)
+        
+        st.session_state.chat_history.append(("user", user_input))
+        
+        try:
+            # Sohbet geçmişini uygun formata dönüştür
+            chat_formatted = []
+            for i in range(0, len(st.session_state.chat_history)-1, 2):
+                if i+1 < len(st.session_state.chat_history):
+                    chat_formatted.append((st.session_state.chat_history[i][1], 
+                                        st.session_state.chat_history[i+1][1]))
+            
+            # Yanıt oluştur
             message_placeholder = st.empty()
-            full_response = ""
+            with st.chat_message("assistant", avatar="🏛️"):
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                # Düşünme animasyonu
+                with st.spinner("Villa Villa Asistanı düşünüyor..."):
+                    response = st.session_state.chat_chain({
+                        "question": user_input,
+                        "chat_history": chat_formatted
+                    })
+                    full_response = response["answer"]
+                    
+                    # Kaynakları logla
+                    if "source_documents" in response:
+                        sources = [doc.metadata.get("source", "Bilinmeyen Kaynak") 
+                                for doc in response["source_documents"]]
 
-            with st.spinner("Villa Villa Asistanı düşünüyor..."):
-                response = st.session_state.chat_chain({
-                    "question": user_input,
-                    "chat_history": chat_formatted
-                })
-                full_response = response["answer"]
 
-                # Kaynakları logla
-                if "source_documents" in response:
-                    sources = [doc.metadata.get("source", "Bilinmeyen Kaynak")
-                               for doc in response["source_documents"]]
-                    logging.info(f"Yanıt kaynakları: {set(sources)}")
-
-                # Yanıtı göster
-                message_placeholder.markdown(full_response)
-
-        st.session_state.chat_history.append(("assistant", full_response))
-
-    except Exception as e:
-        error_msg = f"Yanıt oluşturma hatası: {str(e)}"
-        logging.error(error_msg)
-        with st.chat_message("assistant", avatar="🏛️"):
-            st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu.")
-        st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu."))
