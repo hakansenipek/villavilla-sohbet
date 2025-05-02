@@ -567,47 +567,47 @@ def main():
             logging.error(f"Uygulama başlatılırken bir hata oluştu: {str(e)}")
             st.stop()
     
-    # Sohbet geçmişini görüntüle
-    chat_container = st.container()
-    with chat_container:
-        for i in range(0, len(st.session_state.chat_history), 2):
-            if i < len(st.session_state.chat_history):
-                with st.chat_message("user", avatar="👤"):
-                    st.markdown(st.session_state.chat_history[i][1])
-            
-            if i+1 < len(st.session_state.chat_history):
-                with st.chat_message("assistant", avatar="🏛️"):
-                    st.markdown(st.session_state.chat_history[i+1][1])
-    
-    # Kullanıcı girişi
-    user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
-    
-    # Temizleme butonları
-    cols = st.columns(2)
-    with cols[0]:
-        if st.button("🧹 Sohbeti Temizle", use_container_width=True):
-            st.session_state.chat_history = []
-            st.rerun()
-    with cols[1]:
-        if st.button("🔄 Önbelleği Yenile", use_container_width=True):
-            # Sadece sohbet geçmişini koruyarak sistemi yenile
-            chat_history = st.session_state.chat_history
-            for key in list(st.session_state.keys()):
-                if key != "chat_history":
-                    del st.session_state[key]
-            st.session_state.chat_history = chat_history
-            st.rerun()
-    
-        if user_input:
-            logging.info(f"Kullanıcı sorusu: {user_input}")
+   # Sohbet geçmişini görüntüle
+chat_container = st.container()
+with chat_container:
+    for i in range(0, len(st.session_state.chat_history), 2):
+        if i < len(st.session_state.chat_history):
+            with st.chat_message("user", avatar="👤"):
+                st.markdown(st.session_state.chat_history[i][1])
+        
+        if i+1 < len(st.session_state.chat_history):
+            with st.chat_message("assistant", avatar="🏛️"):
+                st.markdown(st.session_state.chat_history[i+1][1])
+
+# Kullanıcı girişi
+user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
+
+# Temizleme butonları
+cols = st.columns(2)
+with cols[0]:
+    if st.button("🧹 Sohbeti Temizle", use_container_width=True):
+        st.session_state.chat_history = []
+        st.rerun()
+with cols[1]:
+    if st.button("🔄 Önbelleği Yenile", use_container_width=True):
+        # Sadece sohbet geçmişini koruyarak sistemi yenile
+        chat_history = st.session_state.chat_history
+        for key in list(st.session_state.keys()):
+            if key != "chat_history":
+                del st.session_state[key]
+        st.session_state.chat_history = chat_history
+        st.rerun()
+
+if user_input:
+    logging.info(f"Kullanıcı sorusu: {user_input}")
     
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_input)
     
     st.session_state.chat_history.append(("user", user_input))
     
-        try:
-            chat_formatted = []
+    try:
+        chat_formatted = []
         for i in range(0, len(st.session_state.chat_history)-1, 2):
             if i+1 < len(st.session_state.chat_history):
                 chat_formatted.append((st.session_state.chat_history[i][1], 
@@ -619,5 +619,4 @@ def main():
         logging.error(f"Yanıt hatası: {str(e)}")
         with st.chat_message("assistant", avatar="🏛️"):
             st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu.")
-        st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu."))   
-
+        st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu."))
