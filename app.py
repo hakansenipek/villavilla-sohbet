@@ -599,20 +599,20 @@ def main():
             st.rerun()
     
         if user_input:
-    logging.info(f"Kullanıcı sorusu: {user_input}")
+            logging.info(f"Kullanıcı sorusu: {user_input}")
     
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_input)
     
     st.session_state.chat_history.append(("user", user_input))
     
-    try:
-        # Bu satır ve sonraki tüm satırlar girintili olmalı
-        chat_formatted = []
-        for i in range(0, len(st.session_state.chat_history)-1, 2):
-            if i+1 < len(st.session_state.chat_history):
-                chat_formatted.append((st.session_state.chat_history[i][1], 
-                                    st.session_state.chat_history[i+1][1]))
+        try:
+            # Bu satır ve sonraki tüm satırlar girintili olmalı
+            chat_formatted = []
+            for i in range(0, len(st.session_state.chat_history)-1, 2):
+                if i+1 < len(st.session_state.chat_history):
+                     chat_formatted.append((st.session_state.chat_history[i][1], 
+                                         st.session_state.chat_history[i+1][1]))
         
         # Yanıt oluşturma kodları...
         
