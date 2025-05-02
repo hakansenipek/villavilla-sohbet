@@ -15,7 +15,7 @@ from langchain.docstore.document import Document
 from docx import Document as DocxDocument
 import pandas as pd
 import time
-import pinecone
+from pinecone import Pinecone as PineconeClient
 from langchain_pinecone import PineconeVectorStore
 import re
 
