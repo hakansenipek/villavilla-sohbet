@@ -598,9 +598,9 @@ def main():
             st.session_state.chat_history = chat_history
             st.rerun()
     
-if user_input:
+    if user_input:
     logging.info(f"Kullanıcı sorusu: {user_input}")
-    
+
     with st.chat_message("user", avatar="👤"):
         st.markdown(user_input)
 
@@ -609,19 +609,20 @@ if user_input:
     try:
         # Sohbet geçmişini uygun formata dönüştür
         chat_formatted = []
-        for i in range(0, len(st.session_state.chat_history)-1, 2):
-            if i+1 < len(st.session_state.chat_history):
+        for i in range(0, len(st.session_state.chat_history) - 1, 2):
+            if i + 1 < len(st.session_state.chat_history):
                 chat_formatted.append((
-                    st.session_state.chat_history[i][1], 
-                    st.session_state.chat_history[i+1][1]
+                    st.session_state.chat_history[i][1],
+                    st.session_state.chat_history[i + 1][1]
                 ))
 
         # Yanıt oluştur
         message_placeholder = st.empty()
-        with st.chat_message("assistant", avatar="🏛️"):
+        with st.chat_message("assistant", avatar="🏩"):
             message_placeholder = st.empty()
             full_response = ""
 
+            # Düşünme animasyonu
             with st.spinner("Villa Villa Asistanı düşünüyor..."):
                 response = st.session_state.chat_chain({
                     "question": user_input,
@@ -631,7 +632,7 @@ if user_input:
 
                 # Kaynakları logla
                 if "source_documents" in response:
-                    sources = [doc.metadata.get("source", "Bilinmeyen Kaynak") 
+                    sources = [doc.metadata.get("source", "Bilinmeyen Kaynak")
                                for doc in response["source_documents"]]
                     logging.info(f"Yanıt kaynakları: {set(sources)}")
 
@@ -641,8 +642,11 @@ if user_input:
 
     except Exception as e:
         logging.error(f"Yanıt hatası: {str(e)}")
-        with st.chat_message("assistant", avatar="🏛️"):
+        with st.chat_message("assistant", avatar="🏩"):
             st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu. Lütfen tekrar deneyin veya sorunuzu farklı bir şekilde sorun.")
         st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."))
+
+
+
 
 
