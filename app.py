@@ -639,9 +639,6 @@ def main():
         Tedarikçi bilgileri, gider analizleri, personel bilgileri ve daha fazlası 
         hakkında sorular sorabilirsiniz.""")
 
-def main():
-    st.write("Pinecone secrets debug:", st.secrets.get("pinecone", {}))
-
 if __name__ == "__main__":
     try:
         main()
