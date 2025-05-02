@@ -5,8 +5,6 @@ import sys
 import logging
 import tempfile
 import streamlit as st
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import DocArrayInMemorySearch
 from langchain.embeddings import OpenAIEmbeddings
@@ -20,6 +18,7 @@ import time
 from pinecone import Pinecone as PineconeClient
 from langchain_pinecone import PineconeVectorStore
 import re
+import requests
 
 # ---------------------------------------
 # 1. Loglama Ayarları
@@ -75,19 +74,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Başlık bölümü
-with st.container():
-    st.markdown('<div class="main-header">', unsafe_allow_html=True)
-    col1, col2 = st.columns([1, 5])
-    with col1:
-        try:
-            st.image("assets/villa_villa_logo.jpg", width=100)
-        except Exception as e:
-            logging.error(f"Logo yüklenirken hata: {str(e)}")
-    with col2:
-        st.title("Villa Villa Yapay Zeka ile Sohbet")
-    st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------------------------------------
 # 3. API Anahtarları Yönetimi
 # ---------------------------------------
@@ -139,7 +125,6 @@ def download_google_doc(doc_url, file_format="docx"):
         export_url = f"https://docs.google.com/document/d/{doc_id}/export?format={file_format}"
         
         # Dokümanı indir
-        import requests
         response = requests.get(export_url)
         
         # HTTP yanıt kodunu ve içerik uzunluğunu logla
@@ -270,21 +255,22 @@ def init_pinecone():
             return None, None
         
         # Pinecone'u başlat
-        pinecone.init(api_key=api_key, environment=environment)
+        pc = PineconeClient(api_key=api_key)
         
-        # İndeksi kontrol et, yoksa oluştur
-        if index_name not in pinecone.list_indexes():
+        # İndeksi kontrol et
+        indexes = pc.list_indexes()
+        if index_name not in indexes:
             st.info(f"Pinecone indeksi '{index_name}' bulunamadı, oluşturuluyor...")
             # OpenAI embedding modeli için 1536 boyut kullanılır
-            pinecone.create_index(
+            pc.create_index(
                 name=index_name,
-                dimension=1536,
+                dimension=3072,  # text-embedding-3-large için 3072
                 metric="cosine"
             )
             st.success(f"Pinecone indeksi '{index_name}' başarıyla oluşturuldu.")
             
         # İndekse bağlan
-        index = pinecone.Index(index_name)
+        index = pc.Index(index_name)
         
         return index, index_name
         
@@ -298,7 +284,7 @@ def create_or_update_vector_db(documents, namespace="villa_villa"):
     try:
         # OpenAI embeddings oluştur
         embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-small"
+            model="text-embedding-3-large"  # 3072 boyutlu embedding oluşturmak için
         )
         
         # Pinecone'u başlat
@@ -318,22 +304,33 @@ def create_or_update_vector_db(documents, namespace="villa_villa"):
         logging.info(f"Belgeler {len(chunks)} parçaya bölündü")
         
         # Namespace'teki mevcut vektörleri temizle
-        stats = index.describe_index_stats()
-        if namespace in stats.get("namespaces", {}):
-            st.info(f"Pinecone namespace '{namespace}' temizleniyor...")
-            # Mevcut namespace vektörlerini temizle
-            # Not: Bu işlem büyük indekslerde zaman alabilir
-            ids_to_delete = index.query(
-                vector=[0] * 1536,  # Kukla vektör
-                namespace=namespace,
-                top_k=10000,  # Maksimum ID sayısı
-                include_metadata=False,
-                include_values=False
-            )
-            id_list = [item.id for item in ids_to_delete.matches]
-            if id_list:
-                index.delete(ids=id_list, namespace=namespace)
-                st.success(f"Namespace '{namespace}' temizlendi, {len(id_list)} vektör silindi.")
+        try:
+            stats = index.describe_index_stats()
+            if namespace in stats.get("namespaces", {}):
+                st.info(f"Pinecone namespace '{namespace}' temizleniyor...")
+                # Mevcut namespace vektörlerini temizle
+                vector_count = stats["namespaces"][namespace]["vector_count"]
+                
+                if vector_count > 0:
+                    # Boş bir sorgu yaparak tüm verileri al ve ID'leri topla
+                    dummy_vector = [0.0] * 3072  # text-embedding-3-large için 3072 boyut
+                    results = index.query(
+                        vector=dummy_vector,
+                        namespace=namespace,
+                        top_k=min(vector_count, 10000),
+                        include_metadata=False,
+                        include_values=False
+                    )
+                    
+                    # ID'leri topla ve sil
+                    if hasattr(results, 'matches') and results.matches:
+                        id_list = [match.id for match in results.matches]
+                        if id_list:
+                            index.delete(ids=id_list, namespace=namespace)
+                            st.success(f"Namespace '{namespace}' temizlendi, {len(id_list)} vektör silindi.")
+        except Exception as e:
+            st.warning(f"Namespace temizleme sırasında hata: {str(e)}. İşlem devam ediyor...")
+            logging.error(f"Namespace temizleme hatası: {str(e)}")
         
         # Vektör veritabanı oluştur
         with st.spinner(f"Vektörler Pinecone'a yükleniyor ({len(chunks)} parça)..."):
@@ -363,7 +360,7 @@ def load_vector_db_from_pinecone(namespace="villa_villa"):
     try:
         # OpenAI embeddings oluştur
         embeddings = OpenAIEmbeddings(
-            model="text-embedding-3-large"
+            model="text-embedding-3-large"  # 3072 boyutlu embedding
         )
         
         # Pinecone'u başlat
@@ -464,6 +461,23 @@ def create_chat_chain(vector_db):
 # 8. Ana Uygulama
 # ---------------------------------------
 def main():
+    # Session state değişkenleri
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    
+    # Başlık bölümü
+    with st.container():
+        st.markdown('<div class="main-header">', unsafe_allow_html=True)
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            try:
+                st.image("assets/villa_villa_logo.jpg", width=100)
+            except Exception as e:
+                logging.error(f"Logo yüklenirken hata: {str(e)}")
+        with col2:
+            st.title("Villa Villa Yapay Zeka ile Sohbet")
+        st.markdown('</div>', unsafe_allow_html=True)
+    
     # Sidebar bilgileri
     with st.sidebar:
         st.subheader("Villa Villa Asistan Hakkında")
@@ -503,14 +517,10 @@ def main():
         
         # Veri yenileme butonu
         refresh_data = st.button("🔄 Verileri Yenile", use_container_width=True)
-        
+    
     # API anahtarlarını yükle
     if not load_api_keys():
         st.stop()
-
-    # Session state değişkenleri
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
     
     # Google Drive doküman URL'leri
     doc_urls = {
@@ -570,82 +580,68 @@ def main():
             logging.error(f"Uygulama başlatılırken bir hata oluştu: {str(e)}")
             st.stop()
     
-# Sohbet geçmişini görüntüle
-chat_container = st.container()
-with chat_container:
-    for i in range(0, len(st.session_state.chat_history), 2):
-        if i < len(st.session_state.chat_history):
-            with st.chat_message("user", avatar="👤"):
-                st.markdown(st.session_state.chat_history[i][1])
-        
-        if i+1 < len(st.session_state.chat_history):
-            with st.chat_message("assistant", avatar="🏛️"):
-                st.markdown(st.session_state.chat_history[i+1][1])
-
-# Kullanıcı girişi
-user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
-
-# Temizleme butonları
-cols = st.columns(2)
-with cols[0]:
-    if st.button("🧹 Sohbeti Temizle", use_container_width=True):
-        st.session_state.chat_history = []
-        st.rerun()
-with cols[1]:
-    if st.button("🔄 Önbelleği Yenile", use_container_width=True):
-        # Sadece sohbet geçmişini koruyarak sistemi yenile
-        chat_history = st.session_state.chat_history
-        for key in list(st.session_state.keys()):
-            if key != "chat_history":
-                del st.session_state[key]
-        st.session_state.chat_history = chat_history
-        st.rerun()
-
-if user_input:
-    logging.info(f"Kullanıcı sorusu: {user_input}")
-    
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(user_input)
-    
-    st.session_state.chat_history.append(("user", user_input))
-    
-    try:
-        chat_formatted = []
-        for i in range(0, len(st.session_state.chat_history)-1, 2):
+    # Sohbet geçmişini görüntüle
+    chat_container = st.container()
+    with chat_container:
+        for i in range(0, len(st.session_state.chat_history), 2):
+            if i < len(st.session_state.chat_history):
+                with st.chat_message("user", avatar="👤"):
+                    st.markdown(st.session_state.chat_history[i][1])
+            
             if i+1 < len(st.session_state.chat_history):
-                chat_formatted.append((st.session_state.chat_history[i][1], 
-                                    st.session_state.chat_history[i+1][1]))
+                with st.chat_message("assistant", avatar="🏛️"):
+                    st.markdown(st.session_state.chat_history[i+1][1])
+    
+    # Kullanıcı girişi
+    user_input = st.chat_input("Villa Villa hakkında bir soru sorun...")
+    
+    # Temizleme butonları
+    cols = st.columns(2)
+    with cols[0]:
+        if st.button("🧹 Sohbeti Temizle", use_container_width=True):
+            st.session_state.chat_history = []
+            st.rerun()
+    with cols[1]:
+        if st.button("🔄 Önbelleği Yenile", use_container_width=True):
+            # Sadece sohbet geçmişini koruyarak sistemi yenile
+            chat_history = st.session_state.chat_history
+            for key in list(st.session_state.keys()):
+                if key != "chat_history":
+                    del st.session_state[key]
+            st.session_state.chat_history = chat_history
+            st.rerun()
+    
+    if user_input:
+        logging.info(f"Kullanıcı sorusu: {user_input}")
         
-        # Yanıt oluşturma kodları...
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(user_input)
         
-    except Exception as e:
-        logging.error(f"Yanıt hatası: {str(e)}")
-        with st.chat_message("assistant", avatar="🏛️"):
-            st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu.")
-        st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu."))
-
-# ---------------------------------------
-# 9. Uygulama Başlatılıyor
-# ---------------------------------------
-def main():
-    # DEBUG: Pinecone secrets kontrolü
-    st.write("Pinecone secrets debug:", st.secrets.get("pinecone", {}))
-
-    # Sidebar bilgileri
-    with st.sidebar:
-        st.subheader("Villa Villa Asistan Hakkında")
-        st.info("""Bu yapay zeka asistanı, Villa Villa şirketinin finansal ve 
-        operasyonel bilgilerine dayanarak sorularınızı yanıtlamak için tasarlanmıştır.
-        Tedarikçi bilgileri, gider analizleri, personel bilgileri ve daha fazlası 
-        hakkında sorular sorabilirsiniz.""")
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logging.critical(f"Kritik uygulama hatası: {str(e)}")
+        st.session_state.chat_history.append(("user", user_input))
+        
         try:
-            st.error("Beklenmeyen bir hata oluştu. Lütfen logs klasörünü kontrol edin veya uygulamayı yeniden başlatın.")
-        except:
-            print("Streamlit dışında kritik hata:", e)
-
+            # Sohbet geçmişini uygun formata dönüştür
+            chat_formatted = []
+            for i in range(0, len(st.session_state.chat_history)-1, 2):
+                if i+1 < len(st.session_state.chat_history):
+                    chat_formatted.append((st.session_state.chat_history[i][1], 
+                                        st.session_state.chat_history[i+1][1]))
+            
+            # Yanıt oluştur
+            message_placeholder = st.empty()
+            with st.chat_message("assistant", avatar="🏛️"):
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                # Düşünme animasyonu
+                with st.spinner("Villa Villa Asistanı düşünüyor..."):
+                    response = st.session_state.chat_chain({
+                        "question": user_input,
+                        "chat_history": chat_formatted
+                    })
+                    full_response = response["answer"]
+                    
+                    # Kaynakları logla
+                    if "source_documents" in response:
+                        sources = [doc.metadata.get("source", "Bilinmeyen Kaynak") 
+                                for doc in response["source_documents"]]
