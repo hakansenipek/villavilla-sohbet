@@ -654,3 +654,17 @@ if user_input:
         with st.chat_message("assistant", avatar="🏛️"):
             st.error("Üzgünüm, yanıt oluşturulurken bir hata oluştu.")
         st.session_state.chat_history.append(("assistant", "Üzgünüm, bir hata oluştu."))
+
+# ---------------------------------------
+# 9. Uygulama Başlatılıyor
+# ---------------------------------------
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        logging.critical(f"Kritik uygulama hatası: {str(e)}")
+        try:
+            st.error("Beklenmeyen bir hata oluştu. Lütfen logs klasörünü kontrol edin veya uygulamayı yeniden başlatın.")
+        except:
+            print("Streamlit dışında kritik hata:", e)
+
