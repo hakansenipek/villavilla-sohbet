@@ -17,3 +17,5 @@ python-docx>=0.8.11
 pandas>=2.0.0
 docarray>=0.32.0
 requests>=2.25.0
+pinecone-client
+langchain-pinecone
