@@ -1,7 +1,7 @@
 import os
 import logging
 import streamlit as st
-from pinecone import Pinecone as PineconeClient, ServerlessSpec
+from pinecone import Pinecone as Pinecone, ServerlessSpec
 from langchain.embeddings import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -18,7 +18,7 @@ def init_pinecone():
         return None, None
 
     try:
-        pc = PineconeClient(api_key=api_key)
+        pc = Pinecone(api_key=api_key)
 
         # Var olan indeksler arasında arama
         indexes = pc.list_indexes().names()
