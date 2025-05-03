@@ -28,12 +28,12 @@ def init_pinecone():
                 name=index_name,
                 dimension=3072,  # text-embedding-3-large için
                 metric="cosine",
-                spec=ServerlessSpec(cloud="aws", region="us-west-2")
+                spec=ServerlessSpec(cloud="gcp", region="europe-west4")  # ✅ BURASI ÖNEMLİ
             )
             st.success(f"Indeks oluşturuldu: {index_name}")
 
         return pc.Index(index_name), index_name
-
+          
     except Exception as e:
         st.error(f"Pinecone başlatma hatası: {str(e)}")
         logging.exception("Pinecone init hatası")
