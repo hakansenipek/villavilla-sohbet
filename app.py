@@ -259,14 +259,19 @@ def init_pinecone():
         indexes = pc.list_indexes()
         if index_name not in indexes:
             st.info(f"Pinecone indeksi '{index_name}' bulunamadı, oluşturuluyor...")
-            # OpenAI embedding modeli için 1536 boyut kullanılır
+
             pc.create_index(
                 name=index_name,
                 dimension=3072,  # text-embedding-3-large için 3072
-                metric="cosine"
+                metric="cosine",
+            spec=ServerlessSpec(
+            cloud="aws",       # Pinecone projen AWS'de ise
+            region="us-west-2" # Pinecone kontrol panelinden bölgeye göre ayarla
             )
+            )
+
             st.success(f"Pinecone indeksi '{index_name}' başarıyla oluşturuldu.")
-            
+     
         # İndekse bağlan
         index = pc.Index(index_name)
         
