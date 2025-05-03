@@ -1,3 +1,4 @@
+from pinecone import ServerlessSpec
 from pinecone import Pinecone as PineconeClient, ServerlessSpec
 from langchain.embeddings import OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
