@@ -11,7 +11,7 @@ openai>=1.3.0
 tiktoken
 
 # Pinecone entegrasyonu
-pinecone-client
+pinecone
 
 # Google API’leri (Drive erişimi için)
 google-api-python-client>=2.0.0
