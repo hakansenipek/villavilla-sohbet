@@ -28,7 +28,7 @@ def init_pinecone():
                 name=index_name,
                 dimension=3072,  # text-embedding-3-large için
                 metric="cosine",
-                spec=ServerlessSpec(cloud="gcp", region="europe-west4-gcp") 
+                spec=ServerlessSpec(cloud="gcp", region="europe-west4") 
             )
             st.success(f"Indeks oluşturuldu: {index_name}")
 
